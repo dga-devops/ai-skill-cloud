@@ -1,11 +1,11 @@
 ---
 name: coding-cdk-ts
 description: >
-  Apply AWS Prescriptive Guidance for TypeScript CDK development. 
-  Triggers when creating or refactoring AWS stacks, L2 constructs, 
-  multi-environment configurations (sandbox/dev/sit/uat/preprod/prod),
-  security scanning with cdk-nag, and unit testing with assertions. 
-  Use for any task involving CloudFormation synthesis or AWS infrastructure architecture.
+  Apply AWS Prescriptive Guidance for TypeScript CDK development.
+  Triggers when creating, modifying, or reviewing AWS CDK stacks,
+  L2 constructs, multi-environment configurations, cdk-nag security
+  scanning, unit testing, or dependency version management.
+  Use for any task involving CDK code in bin/, lib/, config/, or test/.
 ---
 
 # coding-cdk-ts
@@ -57,6 +57,11 @@ See `references/structure.md` for full details and rationale.
    - **Mandatory**: `uat`, `preprod`, and `prod` MUST have cdk-nag enabled.
    - See `references/security.md` for scanning tools and versioning practices.
 5. **Testing Strategy**: Write fine-grained assertion tests (one test file per stack). Use the ARRANGE → ACT → ASSERT pattern with `Template.fromStack()`. See `references/testing.md`.
+6. **Version Management**: 
+   - **ALWAYS** check the project's dependency versions against `references/versions.md` and report status briefly before any work — but **never recommend or initiate upgrades**. Just report and continue.
+   - When creating a new project, **always show available version tiers** (base/proven/latest) and check for latest from npm. If user doesn't choose, use base.
+   - **NEVER** change dependency versions or edit `references/versions.md` unless the user explicitly requests it.
+   - See `references/versions.md` Section 4–5 for procedures.
 
 ## Core Constraints
 
@@ -67,6 +72,7 @@ See `references/structure.md` for full details and rationale.
 - **No L3 Constructs**: Always prefer L2 constructs; do not use L3 patterns.
 - **Flat Stack Layout**: One file per stack in `lib/`. No nested subdirectories for stacks.
 - **One Config File Per Resource**: Each resource type gets its own file in `config/[env]/` (e.g., `vpc.ts`, `alb.ts`, `aurora.ts`).
+- **Pinned Versions**: All dependency versions and config files (tsconfig, cdk.json, eslint, prettier, jest) MUST match `references/versions.md`. Report version status before every task. **Never change versions or edit versions.md unless user explicitly requests it.**
 
 ---
 > [!TIP]
@@ -76,3 +82,4 @@ See `references/structure.md` for full details and rationale.
 > - `references/config-pattern.md` — TypeScript best practices, naming conventions, interfaces, utility types
 > - `references/testing.md` — TDD approach, fine-grained assertions, unit test templates
 > - `references/security.md` — cdk-nag, Checkov, documentation with TypeDoc, versioning & release
+> - `references/versions.md` — Pinned dependency versions, standardized configs, upgrade/downgrade procedures
