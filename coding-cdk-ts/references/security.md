@@ -126,3 +126,43 @@ Lifecycle management is a significant challenge when you're maintaining AWS CDK 
 4. The pipeline creates a feature branch and then runs `cdk synth` with the new version to confirm there are no errors.
 5. The new version is deployed in the test environment and finally runs an integration test to make sure the deployment is healthy.
 6. You can use two Amazon Simple Queue Service (Amazon SQS) queues to keep track of the stacks. Users can review the stacks manually in the exception queue and address breaking changes. Items that pass the integration test are allowed to be merged and released.
+
+---
+
+## RemovalPolicy
+
+Always set `removalPolicy` explicitly on every stateful resource (S3, RDS, DynamoDB, EFS, etc.). Never rely on CDK's implicit default:
+
+| Environment | Policy | Reason |
+|---|---|---|
+| `sandbox`, `dev` | `RemovalPolicy.DESTROY` | Fast teardown, no production data |
+| `uat`, `preprod`, `prod` | `RemovalPolicy.RETAIN` | Prevent accidental data loss |
+
+Drive the value from config:
+
+```typescript
+removalPolicy: config.env.envName === 'prod'
+  ? RemovalPolicy.RETAIN
+  : RemovalPolicy.DESTROY
+```
+
+---
+
+## IAM: Use Grant Helpers
+
+Prefer L2 grant methods over manually constructed `PolicyStatement` objects — intent is clearer and least-privilege by design:
+
+```typescript
+// ✅ Correct
+bucket.grantRead(lambdaFunction);
+table.grantReadWriteData(lambdaFunction);
+queue.grantSendMessages(lambdaFunction);
+
+// ❌ Avoid — easy to over-permission, hard to review
+lambdaFunction.addToRolePolicy(new iam.PolicyStatement({
+  actions: ['s3:*'],
+  resources: ['*'],
+}));
+```
+
+Use `PolicyStatement` directly only when no grant helper exists for the required permission.

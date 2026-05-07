@@ -186,3 +186,17 @@ Time:        6.142 s, estimated 9 s
 ## Integration Test
 
 Integration tests for AWS CDK constructs can also be included by using an `integ-tests` module. An integration test should be defined as an AWS CDK application. There should be a one-to-one relationship between an integration test and an AWS CDK application. For more information, visit `integ-tests-alpha` module in the *AWS CDK API Reference*.
+
+---
+
+## Deployment Validation Workflow
+
+Run these steps in order before every CDK deployment:
+
+1. **`cdk synth`** — Confirm synthesis succeeds and cdk-nag reports no errors
+2. **`npm run test`** — All assertion tests pass
+3. **`cdk diff`** — Review IAM changes and resource replacements; stop and confirm with the user if unexpected replacements appear
+4. **`cdk deploy`** — Apply the changes
+5. **Verify runtime** — Confirm the deployed resource behaves correctly (e.g., check CloudWatch, hit an endpoint, run a smoke test)
+
+> Never skip step 3 — if the diff shows a replacement on a stateful resource (RDS, DynamoDB, S3) it requires explicit user approval before deploying.

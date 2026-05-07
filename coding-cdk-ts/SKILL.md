@@ -74,6 +74,9 @@ See `references/structure.md` for full details and rationale.
 - **Flat Stack Layout**: One file per stack in `lib/`. No nested subdirectories for stacks.
 - **One Config File Per Resource**: Each resource type gets its own file in `config/[env]/` (e.g., `vpc.ts`, `alb.ts`, `aurora.ts`).
 - **Pinned Versions**: All dependency versions and config files (tsconfig, cdk.json, eslint, prettier, jest) MUST match `references/versions.md`. Report version status before every task. **Never change versions or edit versions.md unless user explicitly requests it.**
+- **No Explicit Resource Names**: Do not set optional name properties (`bucketName`, `tableName`, `functionName`, etc.) unless an external system requires a specific name. Let CDK auto-generate names to enable stack reuse and parallel environment deployments.
+- **500-Resource Limit**: CloudFormation stacks are capped at 500 resources. Split large applications into multiple focused stacks before reaching the limit.
+- **Bootstrap First**: Run `cdk bootstrap aws://<account>/<region>` once per account/region pair before the first `cdk deploy`.
 
 ---
 > [!TIP]
