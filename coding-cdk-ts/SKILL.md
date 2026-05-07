@@ -6,6 +6,9 @@ description: >
   L2 constructs, multi-environment configurations, cdk-nag security
   scanning, unit testing, or dependency version management.
   Use for any task involving CDK code in bin/, lib/, config/, or test/.
+metadata:
+  version: "1.1.0"
+  last-updated: "2026-05-08"
 ---
 
 # coding-cdk-ts
