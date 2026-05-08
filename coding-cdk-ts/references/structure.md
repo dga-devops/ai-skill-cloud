@@ -67,6 +67,7 @@ project-root/
 │   └── config.test.ts         # Config validation tests
 │
 ├── scripts/                   # Build/clean utilities
+├── .gitignore
 ├── .eslintrc.json
 ├── .prettierrc
 ├── jest.config.js

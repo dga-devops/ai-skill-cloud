@@ -238,7 +238,8 @@ Every project must include these scripts:
     "test": "jest",
     "cdk": "cdk",
     "lint": "eslint --ext .js,.ts .",
-    "format": "prettier --ignore-path .gitignore --write '**/*.+(js|ts|json)'"
+    "format": "prettier --ignore-path .gitignore --write '**/*.+(js|ts|json)'",
+    "clean": "find . -path ./node_modules -prune -o \\( -name '*.js' ! -name 'jest.config.js' -o -name '*.d.ts' \\) -type f -exec rm {} +"
   }
 }
 ```
@@ -420,6 +421,16 @@ module.exports = {
   "tabWidth": 2,
   "semi": true
 }
+```
+
+### .gitignore
+
+```gitignore
+*.js
+!jest.config.js
+*.d.ts
+node_modules
+cdk.out
 ```
 
 ---
