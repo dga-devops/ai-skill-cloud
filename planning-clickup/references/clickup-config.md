@@ -74,13 +74,9 @@ Runs only when `clickup.md` does not exist:
    → show available spaces
    → ask: "Which space?"
 
-2. Call clickup_get_workspace_hierarchy (space_ids: [chosen], max_depth: 1)
-   → show folders inside the chosen space
-   → ask: "Which folder holds your projects?"
-
-3. Call clickup_get_folder (folder_id)
-   → show lists (= projects) inside the folder
-   → ask: "Which project does this task belong to?
+2. Call clickup_get_workspace_hierarchy (space_ids: [chosen_space_id], max_depth: 2)
+   → show folders → ask: "Which folder holds your projects?"
+   → show lists inside chosen folder → ask: "Which project does this task belong to?
       1. {{list_name_1}}
       2. {{list_name_2}}
       ...
@@ -88,14 +84,16 @@ Runs only when `clickup.md` does not exist:
 
    IF user picks existing → use its list_id
    IF user picks new project
-     → ask project name → call clickup_create_list → use new list_id
+     → ask project name
+     → call clickup_create_list_in_folder (folder_id, name)
+     → use new list_id
 
-4. (Optional) Ask: "Should I auto-assign tasks to you?"
+3. (Optional) Ask: "Should I auto-assign tasks to you?"
    → If yes, call clickup_resolve_assignees → save default_assignee_id
 
-5. (Optional) Ask: "What are the 'in progress' and 'done' status names?"
+4. (Optional) Ask: "What are the 'in progress' and 'done' status names?"
 
-6. Write clickup.md with space, folder, list + optional values
+5. Write clickup.md with space, folder, list + optional values
    → Confirm: "Config saved → {{space_name}} > {{folder_name}} > {{list_name}}"
 ```
 

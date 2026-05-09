@@ -12,8 +12,7 @@ mcp:
   server: claude_ai_ClickUp
   tools:
     - clickup_get_workspace_hierarchy
-    - clickup_get_folder
-    - clickup_create_list
+    - clickup_create_list_in_folder
     - clickup_create_task
     - clickup_update_task
     - clickup_create_task_comment
@@ -46,13 +45,9 @@ IF clickup.md does NOT exist
    → show available spaces
    → ask: "Which space?"
 
-2. Call clickup_get_workspace_hierarchy (space_ids: [chosen], max_depth: 1)
-   → show folders inside the chosen space
-   → ask: "Which folder holds your projects?"
-
-3. Call clickup_get_folder (folder_id)
-   → show lists (= projects) inside the folder
-   → ask: "Which project does this task belong to?
+2. Call clickup_get_workspace_hierarchy (space_ids: [chosen_space_id], max_depth: 2)
+   → show folders → ask: "Which folder holds your projects?"
+   → show lists inside chosen folder → ask: "Which project does this task belong to?
       1. {{list_name_1}}
       2. {{list_name_2}}
       ...
@@ -61,16 +56,16 @@ IF clickup.md does NOT exist
    IF user picks existing project → use its list_id
    IF user picks new project
      → ask: "What is the project name?"
-     → call clickup_create_list (folder_id, name)
+     → call clickup_create_list_in_folder (folder_id, name)
      → confirm: "Project '{{name}}' created."
      → use the new list_id
 
-4. (Optional) Ask: "Should I auto-assign tasks to you?"
+3. (Optional) Ask: "Should I auto-assign tasks to you?"
    → If yes, call clickup_resolve_assignees to get user ID
 
-5. (Optional) Ask: "What are the 'in progress' and 'done' status names?"
+4. (Optional) Ask: "What are the 'in progress' and 'done' status names?"
 
-6. Write clickup.md with all collected values (space, folder, list + optional defaults)
+5. Write clickup.md with all collected values (space, folder, list + optional defaults)
    → Confirm: "Config saved → {{space_name}} > {{folder_name}} > {{list_name}}"
 ```
 
