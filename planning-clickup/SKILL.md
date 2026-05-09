@@ -6,12 +6,13 @@ description: >
   asks Claude to do something that requires planning, research, writing, coding,
   or any multi-step work.
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
   last-updated: "2026-05-09"
 mcp:
   server: claude_ai_ClickUp
   tools:
     - clickup_get_workspace_hierarchy
+    - clickup_get_list
     - clickup_create_list_in_folder
     - clickup_create_task
     - clickup_update_task
@@ -31,14 +32,16 @@ At the start of every session, check if `clickup.md` exists in the current proje
 
 ```
 IF clickup.md exists
-  → Read space_id, folder_id, and optional defaults
-  → Skip Step 0B — go to Step 0C
+  → Read space_id, folder_id, list_id, and optional defaults
+  → Proceed to Step 1
 
 IF clickup.md does NOT exist
-  → Run Step 0B to create it
+  → Run Step 0B — do NOT proceed until clickup.md is written
 ```
 
 ### Step 0B — Setup (one-time, writes clickup.md)
+
+**Do not proceed to Step 1 until clickup.md has been written successfully.**
 
 ```
 1. Call clickup_get_workspace_hierarchy (max_depth: 0)
@@ -63,10 +66,12 @@ IF clickup.md does NOT exist
 3. (Optional) Ask: "Should I auto-assign tasks to you?"
    → If yes, call clickup_resolve_assignees to get user ID
 
-4. (Optional) Ask: "What are the 'in progress' and 'done' status names?"
+4. (Optional) Ask: "What are the 'in progress' and 'done' status names in this workspace?"
+   → If user skips → call clickup_get_list (list_id) to read available statuses automatically
 
 5. Write clickup.md with all collected values (space, folder, list + optional defaults)
    → Confirm: "Config saved → {{space_name}} > {{folder_name}} > {{list_name}}"
+   → Only after this confirmation, proceed to Step 1
 ```
 
 See `references/clickup-config.md` for full template and field reference.
@@ -89,9 +94,22 @@ When the user gives any request that requires doing work:
 2. Draft a task plan:
    - task name     : short, verb-first (e.g. "Research ClickUp MCP tools")
    - description   : what will be done and why
-   - subtasks      : list if the request is complex (ask user first)
    - priority      : estimate based on urgency in user's message
    - due_date      : only if user mentioned a deadline
+```
+
+### Step 1B — Discovery Questions (complex tasks only)
+
+```
+IF complex task
+  → Ask 2–3 targeted questions to clarify scope BEFORE drafting the plan:
+
+  Example questions:
+  - "What is the expected output or deliverable?"
+  - "Are there constraints or dependencies I should know about?"
+  - "Should this be broken into subtasks or separate tasks?"
+
+  → Wait for answers → THEN proceed to Step 2
 ```
 
 ---
@@ -107,7 +125,7 @@ Present the plan in this format:
 📋 PLAN
 
 Task: {{task_name}}
-List: {{list_name}}
+Project: {{list_name}}
 Priority: {{priority}}
 Due: {{due_date or "not set"}}
 
@@ -115,10 +133,11 @@ Description:
 {{description}}
 
 {{IF complex}}
-Subtasks:
-  - [ ] {{subtask_1}}
-  - [ ] {{subtask_2}}
-  - [ ] {{subtask_3}}
+Structure: {{Subtasks inside 1 parent task / Separate tasks}}
+Items:
+  - [ ] {{item_1}}
+  - [ ] {{item_2}}
+  - [ ] {{item_3}}
 {{END IF}}
 
 Shall I create this task and start working? (yes / edit / cancel)
@@ -126,7 +145,9 @@ Shall I create this task and start working? (yes / edit / cancel)
 ```
 
 ```
-IF user says "yes"     → go to Step 3
+IF user says "yes" / "create" / "สร้างเลย" / "ทำเลย" / "ok"
+  → treat as approval → go to Step 3
+
 IF user says "edit"    → let user modify, then re-show plan
 IF user says "cancel"  → stop, do not create task
 ```
@@ -135,10 +156,22 @@ IF user says "cancel"  → stop, do not create task
 
 ## Step 3 — Create Task in ClickUp
 
+**For complex tasks, confirm structure before creating:**
+
+```
+IF complex AND structure not yet decided (Step 1B was skipped)
+  → Ask: "Should the sub-items be:
+      A) Subtasks inside 1 parent task
+      B) Separate tasks in the same project"
+  → Wait for answer before creating
+```
+
+**Create parent task:**
+
 ```yaml
 tool: clickup_create_task
 inputs:
-  list_id: "{{list_id resolved from Step 0B}}"
+  list_id: "{{list_id from clickup.md}}"
   name: "{{task_name}}"
   markdown_description: "{{description}}"
   assignees: ["{{default_assignee_id}}"]  # omit if default_assignee_id is blank
@@ -146,21 +179,16 @@ inputs:
   due_date: "{{YYYY-MM-DD}}"              # omit if not set
 ```
 
-**If complex request → ask user:**
-```
-"This looks like a large task. Should the sub-items be:
-  A) Subtasks inside this task
-  B) Separate tasks in the same list"
-```
-
-**If user chooses A (subtasks):**
+**If user chose A (subtasks):**
 ```yaml
 tool: clickup_create_task
 inputs:
   list_id: "{{list_id}}"
   name: "{{subtask_name}}"
-  parent: "{{parent_task_id}}"   # creates as subtask
+  parent: "{{parent_task_id}}"
 ```
+
+**If user chose B (separate tasks):** repeat `clickup_create_task` for each item without `parent`.
 
 **After creating:**
 ```
@@ -225,9 +253,12 @@ User says "whenever" / "low priority"     → "low"
 
 ## Behaviour Rules
 
+- **Never skip Step 0B.** Do not proceed until `clickup.md` is written and confirmed.
 - **Never skip Step 1–2.** Do not create a ClickUp task without showing the plan first.
 - **Never start working** before `clickup_create_task` succeeds.
-- **Read clickup.md first.** If file missing, set it up before anything else.
+- **Implicit approval.** If user says "create" / "สร้างเลย" / "ทำเลย" / "ok" → treat as yes.
+- **Run Discovery Questions** for complex tasks before drafting the plan (Step 1B).
+- **Always confirm task structure** (subtasks vs. separate) before creating complex tasks.
 - **Ask, don't guess** for list selection and subtask vs. new task decisions.
 - **Keep task names short and verb-first.** "Research X", "Fix Y", "Write Z".
 - **One task per user request** unless the request explicitly involves multiple separate deliverables.
