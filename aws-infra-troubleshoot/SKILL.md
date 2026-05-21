@@ -29,7 +29,7 @@ description: Troubleshoot and diagnose AWS infrastructure issues, especially ECS
 ถาม user ว่าจะทำงานกับ account ไหน (เช่น `301109183009`)
 
 เมื่อได้ account ID แล้ว:
-1. อ่านไฟล์ `C:\Users\chanvit\.aws\config`
+1. อ่านไฟล์ `~/.aws/config` (path ตาม OS ของ user เช่น Windows: `%USERPROFILE%\.aws\config`, macOS/Linux: `~/.aws/config`)
 2. หา profile ที่มี `sso_account_id` ตรงกับ account ID ที่ user ให้มา
 3. ใช้ profile นั้นเป็น `--profile <profile_name>` ในทุก aws cli command ต่อไป
 
@@ -158,4 +158,5 @@ description: Troubleshoot and diagnose AWS infrastructure issues, especially ECS
 > - Application logs ที่ละเอียดกว่า
 > - Business logic / code ที่เกี่ยวข้อง
 > - Configuration ของ application เอง
+
 
