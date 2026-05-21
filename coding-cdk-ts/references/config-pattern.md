@@ -191,7 +191,7 @@ In each environment's resource config, set `enabled` to `true` or `false`:
 // config/dev/redis.ts — Redis enabled in dev
 export const devRedis: RedisConfig = {
   enabled: true,
-  cacheName: `${devEnv.projectName}-${devEnv.envName}`,
+  cacheName: `${devEnv.projectName}-${devEnv.envName}-redis-cache`,
   // ...
 };
 
