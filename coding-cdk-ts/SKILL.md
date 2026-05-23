@@ -103,7 +103,7 @@ See `references/structure.md` for full details and rationale.
 
 ---
 
-## Design Handoff (from design-miniapps skill)
+## Design Handoff (from design skill)
 
 When user says "create CDK from design", "generate CDK project", or references a design doc:
 

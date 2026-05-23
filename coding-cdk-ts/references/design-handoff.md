@@ -1,6 +1,6 @@
 # Design Handoff Patterns
 
-> Patterns for creating CDK projects from `design-miniapps` skill output.
+> Patterns for creating CDK projects from a design skill output (e.g. `design-aws`).
 > These patterns extend the base patterns in other reference files.
 
 ---
@@ -456,7 +456,7 @@ const webAcl = new wafv2.CfnWebACL(this, 'WebAcl', {
 
 ## Stacks to Generate
 
-Based on a typical miniapp design doc:
+Based on a typical AWS service design doc:
 
 | Stack | File | Condition |
 |-------|------|-----------|
