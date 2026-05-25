@@ -86,10 +86,11 @@ Follow `references/checklist.md` — 13 sections.
 
 ### Step 3: Generate Output
 
-After all sections complete, generate 2 files in `designs/<app-name>/`:
+After all sections complete, generate 3 files in `designs/<app-name>/`:
 
 1. **`design.md`** — Markdown design document (use `references/design-doc-template.md`)
-2. **`diagram.py`** — mingrammer/diagrams Python (use `references/diagram-python-template.py`)
+2. **`diagram.yaml`** — awslabs/diagram-as-code YAML (use `references/diagram-dac-template.yaml`)
+3. **`diagram.py`** — mingrammer/diagrams Python (use `references/diagram-python-template.py`)
 
 ### Step 4: Handoff
 
@@ -117,4 +118,5 @@ After generating:
 - `references/checklist.md` — Full question list (13 sections)
 - `references/profiles.md` — Environment tier profiles and spec calculation
 - `references/design-doc-template.md` — Markdown output template
+- `references/diagram-dac-template.yaml` — awslabs/diagram-as-code template
 - `references/diagram-python-template.py` — mingrammer/diagrams Python template

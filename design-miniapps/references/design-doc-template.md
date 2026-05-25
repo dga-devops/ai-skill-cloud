@@ -263,10 +263,12 @@ Replace `{{placeholder}}` with actual values from the checklist.
 
 ## Diagrams
 
-- Architecture diagram: [`diagram.py`](./diagram.py)
+- Architecture diagram (DAC): [`diagram.yaml`](./diagram.yaml)
+- Architecture diagram (Python): [`diagram.py`](./diagram.py)
 
 Render:
 ```bash
+awsdac diagram.yaml -o architecture.png
 python diagram.py
 ```
 
