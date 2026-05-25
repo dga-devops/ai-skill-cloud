@@ -66,7 +66,6 @@ project-root/
 │   ├── redis-stack.test.ts
 │   └── config.test.ts         # Config validation tests
 │
-├── scripts/                   # Build/clean utilities
 ├── .gitignore
 ├── .eslintrc.json
 ├── .prettierrc

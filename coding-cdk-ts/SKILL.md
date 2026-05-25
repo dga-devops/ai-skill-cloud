@@ -40,7 +40,6 @@ project-root/
 ├── test/                      # QUALITY LAYER — fine-grained assertion tests
 │   ├── network-stack.test.ts  # One test file per stack
 │   └── config.test.ts         # Config validation tests
-├── scripts/                   # Build/clean utilities
 ├── .gitignore
 ├── .eslintrc.json
 ├── .prettierrc
