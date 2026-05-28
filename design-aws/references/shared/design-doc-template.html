@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{APP_NAME}} — Architecture Design</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f4f6f9;color:#1a1a2e;line-height:1.6}
+header{background:#232f3e;color:#fff;padding:2rem;text-align:center}
+header h1{font-size:1.8rem;margin-bottom:.5rem}
+header p{opacity:.8;font-size:1rem}
+.container{max-width:1100px;margin:0 auto;padding:1.5rem}
+.card{background:#fff;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.07);padding:1.5rem 2rem;margin-bottom:1.5rem}
+.card h2{font-size:1.4rem;margin-bottom:1rem;padding-bottom:.5rem;border-bottom:2px solid #e8e8e8}
+.card h3{font-size:1.1rem;margin:1.2rem 0 .6rem;color:#232f3e}
+.card-nonprod{border-left:4px solid #2196F3}
+.card-prod{border-left:4px solid #e53935}
+table{width:100%;border-collapse:collapse;margin:.8rem 0 1.2rem;font-size:.9rem}
+th{background:#232f3e;color:#fff;padding:.6rem .8rem;text-align:left;font-weight:600}
+td{padding:.5rem .8rem;border-bottom:1px solid #e8e8e8}
+tr:hover td{background:#f8f9fb}
+.badge-yes{display:inline-block;background:#d1fae5;color:#065f46;padding:2px 10px;border-radius:10px;font-size:.8rem;font-weight:600}
+.badge-no{display:inline-block;background:#fee2e2;color:#991b1b;padding:2px 10px;border-radius:10px;font-size:.8rem;font-weight:600}
+pre{background:#1e1e2e;color:#e0e0e0;padding:1rem;border-radius:8px;overflow-x:auto;font-size:.85rem;margin:.8rem 0}
+code{font-family:'Fira Code','JetBrains Mono',monospace;background:#f1f5f9;padding:.1rem .4rem;border-radius:4px;font-size:.85rem}
+pre code{background:none;padding:0}
+blockquote{border-left:4px solid #ff9800;background:#fff8e1;padding:.8rem 1rem;margin:.8rem 0;border-radius:0 6px 6px 0;font-size:.9rem}
+.meta-table td:first-child{font-weight:600;width:140px}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}
+strong{color:#232f3e}
+@media(max-width:768px){.container{padding:1rem}.card{padding:1rem}table{font-size:.8rem}th,td{padding:.4rem}.two-col{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<!-- ============ HEADER ============ -->
+<header>
+<h1>{{APP_NAME}} — Architecture Design</h1>
+<p>{{DESCRIPTION}} | {{PATTERN}} on AWS</p>
+</header>
+
+<div class="container">
+
+<!-- ============ METADATA ============ -->
+<div class="card">
+<h2>Project Metadata</h2>
+<table class="meta-table">
+<tr><td>App Name</td><td><code>{{APP_NAME}}</code></td></tr>
+<tr><td>Description</td><td>{{DESCRIPTION}}</td></tr>
+<tr><td>Owner</td><td>{{OWNER}}</td></tr>
+<tr><td>Team</td><td>{{TEAM}}</td></tr>
+<tr><td>Created</td><td>{{DATE}}</td></tr>
+<tr><td>Environments</td><td><code>{{ENVIRONMENTS}}</code></td></tr>
+<tr><td>Prod Spec</td><td>{{PROD_SPEC}}</td></tr>
+</table>
+</div>
+
+<!-- ============ ARCHITECTURE OVERVIEW ============ -->
+<div class="card">
+<h2>Architecture Overview</h2>
+<p><!-- Description of architecture --></p>
+
+<h3>Traffic Ingress</h3>
+<table>
+<thead><tr><th>Path</th><th>Flow</th><th>Environments</th></tr></thead>
+<tbody>
+<!-- Traffic paths -->
+</tbody>
+</table>
+</div>
+
+<!-- ============ SERVICES ============ -->
+<div class="card">
+<h2>Services</h2>
+<table>
+<thead><tr><th>Service</th><th>Port</th><th>Path Pattern</th><th>Health Check</th><th>Runtime</th></tr></thead>
+<tbody>
+<!-- Service rows -->
+</tbody>
+</table>
+</div>
+
+<!-- ============ ALB LISTENER RULES ============ -->
+<div class="card">
+<h2>ALB Listener Rules</h2>
+<p>Rules use <strong>2 conditions</strong>: host-header + path-pattern</p>
+<table>
+<thead><tr><th>Env</th><th>Service</th><th>Priority</th><th>Host Header</th><th>Path Pattern</th></tr></thead>
+<tbody>
+<!-- Listener rule rows -->
+</tbody>
+</table>
+</div>
+
+<!-- ============ DOMAINS ============ -->
+<div class="card">
+<h2>Domains</h2>
+<table>
+<thead><tr><th>Environment</th><th>Domain</th><th>Account</th><th>Zone ID</th><th>Tier</th></tr></thead>
+<tbody>
+<!-- Domain rows -->
+</tbody>
+</table>
+</div>
+
+<!-- ============ NON-PROD DESIGN ============ -->
+<div class="card card-nonprod">
+<h2>🔵 Non-Prod Design</h2>
+
+<h3>Traffic Flow</h3>
+<pre><code><!-- Non-prod traffic flow --></code></pre>
+
+<h3>Architecture Characteristics</h3>
+<table>
+<thead><tr><th>Config</th><!-- env columns --></tr></thead>
+<tbody>
+<!-- Use <span class="badge-yes">Yes</span> or <span class="badge-no">No</span> for boolean values -->
+</tbody>
+</table>
+
+<h3>Resources</h3>
+<table>
+<thead><tr><th>Resource Type</th><th>Name Pattern</th><th>Key Config</th></tr></thead>
+<tbody>
+<!-- Resource rows -->
+</tbody>
+</table>
+
+<h3>Security Groups</h3>
+<div class="two-col">
+<div>
+<h3>sg-alb</h3>
+<table>
+<thead><tr><th>Dir</th><th>Port</th><th>Source/Dest</th><th>Purpose</th></tr></thead>
+<tbody><!-- SG rules --></tbody>
+</table>
+</div>
+<div>
+<h3>sg-ecs</h3>
+<table>
+<thead><tr><th>Dir</th><th>Port</th><th>Source/Dest</th><th>Purpose</th></tr></thead>
+<tbody><!-- SG rules --></tbody>
+</table>
+</div>
+</div>
+</div>
+
+<!-- ============ PROD DESIGN ============ -->
+<div class="card card-prod">
+<h2>🔴 Prod Design</h2>
+
+<h3>Traffic Flow</h3>
+<pre><code><!-- Prod traffic flow --></code></pre>
+
+<h3>Architecture Characteristics</h3>
+<table>
+<thead><tr><th>Config</th><th>prod</th></tr></thead>
+<tbody>
+<!-- Use <span class="badge-yes">Yes</span> or <span class="badge-no">No</span> for boolean values -->
+</tbody>
+</table>
+
+<h3>Resources</h3>
+<table>
+<thead><tr><th>Resource Type</th><th>Name Pattern</th><th>Key Config</th></tr></thead>
+<tbody>
+<!-- Resource rows -->
+</tbody>
+</table>
+
+<h3>Security Groups</h3>
+<div class="two-col">
+<div>
+<h3>sg-alb</h3>
+<table>
+<thead><tr><th>Dir</th><th>Port</th><th>Source/Dest</th><th>Purpose</th></tr></thead>
+<tbody><!-- SG rules --></tbody>
+</table>
+</div>
+<div>
+<h3>sg-ecs</h3>
+<table>
+<thead><tr><th>Dir</th><th>Port</th><th>Source/Dest</th><th>Purpose</th></tr></thead>
+<tbody><!-- SG rules --></tbody>
+</table>
+</div>
+</div>
+</div>
+
+<!-- ============ IAM ROLES ============ -->
+<div class="card">
+<h2>IAM Roles</h2>
+
+<h3>ECS Task Execution Role</h3>
+<table>
+<thead><tr><th>Policy</th><th>Actions</th><th>Resource</th></tr></thead>
+<tbody><!-- IAM rows --></tbody>
+</table>
+
+<h3>ECS Task Role</h3>
+<blockquote>Task Role permissions TBD — define when app needs AWS services.</blockquote>
+</div>
+
+<!-- ============ EXISTING INFRASTRUCTURE ============ -->
+<div class="card">
+<h2>Existing Infrastructure</h2>
+
+<h3><!-- Account name + ID --></h3>
+<table>
+<thead><tr><th>Resource</th><th>Name</th><th>ID</th></tr></thead>
+<tbody><!-- Existing resource rows --></tbody>
+</table>
+
+<!-- Repeat per account -->
+</div>
+
+<!-- ============ OBSERVABILITY ============ -->
+<div class="card">
+<h2>Observability</h2>
+
+<h3>Log Retention</h3>
+<table>
+<thead><tr><th>Env</th><th>Retention</th></tr></thead>
+<tbody>
+<!-- Log retention per env -->
+</tbody>
+</table>
+
+<h3>CloudWatch Dashboard</h3>
+<table>
+<thead><tr><th>Env</th><th>Enabled</th></tr></thead>
+<tbody>
+<!-- Dashboard per env -->
+</tbody>
+</table>
+
+<h3>Alarms (pre-prod/prod)</h3>
+<table>
+<thead><tr><th>Metric</th><th>Threshold</th></tr></thead>
+<tbody>
+<tr><td>CPU utilization</td><td>80%</td></tr>
+<tr><td>Memory utilization</td><td>80%</td></tr>
+<tr><td>Running task count &lt; desired</td><td>Yes</td></tr>
+<tr><td>ALB target response time (P95)</td><td>3s</td></tr>
+<tr><td>ALB 5xx error count</td><td>10/min</td></tr>
+<tr><td>ALB unhealthy host count</td><td>1</td></tr>
+</tbody>
+</table>
+</div>
+
+<!-- ============ SECURITY ============ -->
+<div class="card">
+<h2>Security</h2>
+
+<h3>WAF</h3>
+<table>
+<thead><tr><th>Config</th><th>Value</th></tr></thead>
+<tbody>
+<tr><td>Enabled</td><td><!-- prod only --></td></tr>
+<tr><td>Rate limit</td><td><!-- 2000 --></td></tr>
+<tr><td>Rules</td><td><!-- CommonRuleSet, KnownBadInputsRuleSet --></td></tr>
+</tbody>
+</table>
+
+<h3>ECS</h3>
+<table>
+<thead><tr><th>Config</th><th>non-prod</th><th>prod</th></tr></thead>
+<tbody>
+<tr><td>Execute command</td><td><!-- Yes/No --></td><td><!-- Yes/No --></td></tr>
+<tr><td>Deletion protection</td><td><!-- Yes/No --></td><td><!-- Yes/No --></td></tr>
+</tbody>
+</table>
+
+<h3>ALB</h3>
+<table>
+<thead><tr><th>Config</th><th>Value</th></tr></thead>
+<tbody>
+<tr><td>HTTPS only</td><td>Yes</td></tr>
+<tr><td>SSL policy</td><td>TLS13</td></tr>
+</tbody>
+</table>
+</div>
+
+<!-- ============ ECR ============ -->
+<div class="card">
+<h2>ECR</h2>
+<table>
+<thead><tr><th>Env</th><th>Tag Mutability</th><th>Lifecycle (max images)</th></tr></thead>
+<tbody>
+<!-- ECR config per env -->
+</tbody>
+</table>
+<p style="color:#6b7280;font-size:.85rem;">Initial image tag: <code>init-v0.1.0</code> (policy)</p>
+</div>
+
+<!-- ============ DEPLOY ORDER ============ -->
+<div class="card">
+<h2>Deploy Order</h2>
+<table>
+<thead><tr><th>Step</th><th>Stack</th><th>Account</th><th>Profile</th><th>Depends On</th></tr></thead>
+<tbody>
+<!-- Deploy order rows -->
+</tbody>
+</table>
+</div>
+
+<!-- ============ DIAGRAMS ============ -->
+<div class="card">
+<h2>Diagrams</h2>
+
+<h3 style="color:#2196F3;">Non-Prod Architecture</h3>
+<img src="diagram_nonprod.png" alt="Non-Prod Architecture" style="max-width:100%;border-radius:8px;margin:1rem 0;">
+
+<h3 style="color:#e53935;">Prod Architecture</h3>
+<img src="diagram_prod.png" alt="Prod Architecture" style="max-width:100%;border-radius:8px;margin:1rem 0;">
+
+<p style="color:#6b7280;font-size:.85rem;">Render: <code>python3 diagram_nonprod.py && python3 diagram_prod.py</code></p>
+</div>
+
+<!-- ============ HANDOFF ============ -->
+<div class="card">
+<h2>Handoff to CDK</h2>
+<p>Once approved, use <code>coding-cdk-ts</code> skill to generate CDK project.</p>
+<ol style="margin:.5rem 0 .5rem 1.5rem">
+<li>Create project structure (three-layer architecture)</li>
+<li>Generate <code>config/types.ts</code> from CDK Config Values</li>
+<li>Create per-environment configs</li>
+<li>Generate stacks based on resource list</li>
+</ol>
+</div>
+
+</div><!-- end container -->
+</body>
+</html>

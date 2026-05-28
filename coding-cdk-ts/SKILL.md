@@ -86,6 +86,8 @@ See `references/structure.md` for full details and rationale.
     - S3 (globally unique): `${projectName}-${envName}-s3-<purpose>-${account}` (e.g., `myproject-dev-s3-assets-123456789012`)
     
     Always include `<purpose>` even if only one instance exists, for consistency. Names are constructed in config using `IntraEnvConfig` values — never hardcoded in `lib/`.
+    
+    **Length validation**: Always test generated names with the longest env name (`pre-prod`). Key limits: Target Group = 32, ALB/NLB = 32, IAM Role = 64, S3 = 63. If exceeded, shorten the purpose suffix (e.g. `frontend` → `fe`). See `references/naming-limits.md` for full list.
 - **500-Resource Limit**: CloudFormation stacks are capped at 500 resources. Split large applications into multiple focused stacks before reaching the limit.
 - **Bootstrap First**: Run `cdk bootstrap aws://<account>/<region>` once per account/region pair before the first `cdk deploy`.
 
