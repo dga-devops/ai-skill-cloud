@@ -1,0 +1,28 @@
+# Project: demo — networks defined once, mapped per environment.
+# dev / sit / uat share ONE existing VPC; prod builds its own.
+
+networks:
+
+  nonprod:                       # ← defined ONCE, shared by dev / sit / uat
+    mode: existing
+    existing:
+      vpcId: vpc-0nonprod00000001
+      publicSubnetIds:
+        - subnet-0np-pub1
+        - subnet-0np-pub2
+      privateSubnetIds:
+        - subnet-0np-pri1
+        - subnet-0np-pri2
+
+  prod:                          # ← prod creates its own dedicated VPC
+    mode: create
+    create:
+      cidr: 10.30.0.0/16
+      maxAzs: 2
+      natGateways: 2
+
+environments:                    # which network each env uses
+  dev:  nonprod
+  sit:  nonprod
+  uat:  nonprod
+  prod: prod

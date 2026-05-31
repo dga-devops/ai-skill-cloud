@@ -1,0 +1,31 @@
+# network.template.yaml — Layer-3 network(s) for a project, mapped per environment.
+#
+# Define each DISTINCT network once under `networks:` (give it a name), then map
+# every environment to one under `environments:`. Environments that share a
+# network point at the same name — zero duplication.
+#
+# Each network has the same simple shape:
+#   mode: existing → use a VPC + subnets that already exist (give the ids)
+#   mode: create   → CDK builds a new VPC + subnets + NAT (give the sizing)
+#
+# Scope is L3 only. ALB / NLB / CloudFront / domain live in the platform template.
+#
+# Legend:  [REQUIRED] must fill  |  [optional: X] default is X
+
+networks:                                 # [REQUIRED] one or more named networks
+  {{NETWORK_NAME}}:                        # [REQUIRED] kebab-case name, referenced below
+    mode: {{existing | create}}            # [REQUIRED]
+
+    existing:                              # fill when mode = existing
+      vpcId: {{VPC_ID}}
+      publicSubnetIds: [{{SUBNET_ID}}]
+      privateSubnetIds: [{{SUBNET_ID}}]    # workloads run here
+      isolatedSubnetIds: [{{SUBNET_ID}}]   # [optional] no egress; e.g. databases
+
+    create:                                # fill when mode = create
+      cidr: {{CIDR}}                       # e.g. 10.0.0.0/16
+      maxAzs: {{N}}                        # [optional: 2]
+      natGateways: {{N}}                   # [optional: 1]
+
+environments:                             # [REQUIRED] map every env → a network name
+  {{ENV_NAME}}: {{NETWORK_NAME}}

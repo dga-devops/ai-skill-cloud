@@ -1,0 +1,31 @@
+# Project: demo — ECS Fargate platform (services + ALB routing + per-env sizing).
+# Sits on top of the network defined in network.yaml.
+
+pattern: ecs-fargate
+
+basePath: /cp/dga/demo
+
+services:
+  - name: api
+    type: api
+    port: 3000
+    healthCheckPath: /health
+    path: "{base}/api/*"          # → /cp/dga/demo/api/*
+    cpu: 512                      # default sizing (used by dev / sit / uat)
+    memory: 1024
+    desiredCount: 1
+
+  - name: frontend
+    type: frontend
+    port: 4200
+    healthCheckPath: /
+    path: "{base}/*"              # → /cp/dga/demo/*  (catch-all, lower priority)
+    cpu: 512
+    memory: 1024
+    desiredCount: 1
+
+# prod is bigger. dev / sit / uat aren't listed → they use the defaults above.
+environments:
+  prod:
+    api:      { cpu: 2048, memory: 4096, desiredCount: 3 }
+    frontend: { cpu: 1024, memory: 2048, desiredCount: 2 }

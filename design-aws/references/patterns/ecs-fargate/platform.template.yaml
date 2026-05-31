@@ -1,0 +1,44 @@
+# platform.template.yaml — ECS Fargate platform.
+#
+# This is the "exposure + compute" layer that sits ON TOP of a network
+# (network.yaml). It defines the services that run and how they are reached.
+#
+# This step covers SERVICES + ALB path routing + PER-ENV SIZING.
+# (ALB existing/create and CloudFront/WAF come as the next sections.)
+#
+# Pattern (same as network.yaml): define things ONCE, then vary per env under
+# `environments:`. Here the service shape is shared; only sizing differs per env.
+#
+# Legend:  [REQUIRED] must fill  |  [optional: X] default is X
+
+pattern: ecs-fargate
+
+basePath: {{BASE_PATH}}                     # [REQUIRED] e.g. /cp/dga/demo — services use this as {base}
+
+services:                                   # [REQUIRED] at least 1
+  - name: {{NAME}}                          # [REQUIRED] kebab-case, unique
+    type: {{api | frontend | worker}}       # [REQUIRED]
+    port: {{PORT}}                          # [REQUIRED unless worker] api=3000, frontend=4200
+    healthCheckPath: {{PATH}}               # [optional: /health] not used by worker
+    path: {{ROUTE}}                         # [optional: by type] ALB routes this → service; worker has none
+    # default sizing — used by EVERY env unless overridden under environments: below
+    cpu: {{CPU}}                            # [REQUIRED] 256 | 512 | 1024 | 2048 | 4096
+    memory: {{MEMORY}}                      # [REQUIRED] MB (valid combo with cpu)
+    desiredCount: {{N}}                     # [optional: 1]
+
+# Per-env sizing overrides — write ONLY what differs from the defaults above.
+# Envs not listed use the defaults entirely (e.g. dev/sit/uat = no entry needed).
+# Within an env, list only the services that differ, and only the fields that differ.
+environments:                               # [optional]
+  {{ENV_NAME}}:
+    {{SERVICE_NAME}}: { cpu: {{CPU}}, memory: {{MEMORY}}, desiredCount: {{N}} }
+
+# Service types:
+#   api       → ALB target, path like {base}/api/*   (no CDN cache)
+#   frontend  → ALB target, path like {base}/*       (CDN cached)
+#   worker    → no ALB target, no path (background processing)
+#
+# NEXT sections (added once this is confirmed):
+#   alb:        existing | create   (non-prod reuses shared ALB; prod creates one)
+#   cloudfront: CDN + WAF
+#   domain/cert
