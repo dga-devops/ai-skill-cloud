@@ -1,13 +1,11 @@
 # platform.template.yaml — ECS Fargate platform.
 #
-# This is the "exposure + compute" layer that sits ON TOP of a network
-# (network.yaml). It defines the services that run and how they are reached.
+# The "exposure + compute" layer on top of a network (network.yaml): the
+# services that run, the ALB that exposes them, and the ACM cert for HTTPS.
 #
-# This step covers SERVICES + ALB path routing + PER-ENV SIZING.
-# (ALB existing/create and CloudFront/WAF come as the next sections.)
-#
-# Pattern (same as network.yaml): define things ONCE, then vary per env under
-# `environments:`. Here the service shape is shared; only sizing differs per env.
+# Same pattern as network.yaml everywhere: define things ONCE (networks / albs /
+# certificates), then reference them per env under `environments:`. Anything
+# shared by several envs (a VPC, an ALB, a wildcard cert) is written only once.
 #
 # Legend:  [REQUIRED] must fill  |  [optional: X] default is X
 
@@ -16,7 +14,7 @@ pattern: ecs-fargate
 basePath: {{BASE_PATH}}                     # [REQUIRED] e.g. /cp/dga/demo — services use this as {base}
 
 placement:                                  # [optional] which network.yaml subnet tier each part uses
-  services: {{container | private}}         # [optional: container] ECS tasks run here (falls back to private if no container tier)
+  services: {{container | private}}         # [optional: container] ECS tasks run here (falls back to private)
 
 services:                                   # [REQUIRED] at least 1
   - name: {{NAME}}                          # [REQUIRED] kebab-case, unique
@@ -29,19 +27,38 @@ services:                                   # [REQUIRED] at least 1
     memory: {{MEMORY}}                      # [REQUIRED] MB (valid combo with cpu)
     desiredCount: {{N}}                     # [optional: 1]
 
-# Per-env sizing overrides — write ONLY what differs from the defaults above.
-# Envs not listed use the defaults entirely (e.g. dev/sit/uat = no entry needed).
-# Within an env, list only the services that differ, and only the fields that differ.
-environments:                               # [optional]
+albs:                                       # [REQUIRED] one or more named ALBs (define a shared one ONCE)
+  {{ALB_NAME}}:                             # [REQUIRED] kebab-case name, referenced under environments:
+    mode: {{existing | create}}             # [REQUIRED]
+    # when mode = existing — reuse an ALB that already exists
+    albArn: {{ALB_ARN}}                     # [REQUIRED if existing]
+    listenerArn: {{LISTENER_ARN}}           # [REQUIRED if existing]
+    # when mode = create — build a new ALB
+    scheme: {{internet-facing | internal}}  # [optional: internet-facing]
+    healthCheck:                            # [optional]
+      interval: 30                          # [optional: 30]
+      healthyThreshold: 3                   # [optional: 3]
+      unhealthyThreshold: 3                 # [optional: 3]
+
+certificates:                               # [REQUIRED] named ACM certs — a wildcard shared by many envs is defined ONCE
+  {{CERT_NAME}}:                            # [REQUIRED] kebab-case name, referenced under environments:
+    mode: {{create-new | existing}}         # [REQUIRED]
+    domain: {{DOMAIN}}                      # [REQUIRED if create-new] e.g. "*.nonprod.example" (wildcard)
+    arn: {{ACM_ARN}}                        # [REQUIRED if existing]
+
+# Each env references an ALB + a cert (shared ones written once above) and gives
+# its own hostname. The hostname must be covered by the referenced cert.
+environments:                               # [REQUIRED] per env: alb + certificate + domain + sizing overrides
   {{ENV_NAME}}:
-    {{SERVICE_NAME}}: { cpu: {{CPU}}, memory: {{MEMORY}}, desiredCount: {{N}} }
+    alb: {{ALB_NAME}}                       # [REQUIRED] reference albs:
+    certificate: {{CERT_NAME}}              # [REQUIRED] reference certificates: (a wildcard can serve many envs)
+    domain: {{HOSTNAME}}                    # [REQUIRED] this env's hostname (must match the cert, e.g. orders-dev.nonprod.example)
+    services:                               # [optional] override ONLY what differs from the defaults above
+      {{SERVICE_NAME}}: { cpu: {{CPU}}, memory: {{MEMORY}}, desiredCount: {{N}} }
 
 # Service types:
 #   api       → ALB target, path like {base}/api/*   (no CDN cache)
 #   frontend  → ALB target, path like {base}/*       (CDN cached)
 #   worker    → no ALB target, no path (background processing)
 #
-# NEXT sections (added once this is confirmed):
-#   alb:        existing | create   (non-prod reuses shared ALB; prod creates one)
-#   cloudfront: CDN + WAF
-#   domain/cert
+# NEXT sections: Route53 record (domain → ALB), cloudfront (CDN + WAF).
