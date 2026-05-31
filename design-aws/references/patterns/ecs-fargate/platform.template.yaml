@@ -15,6 +15,9 @@ pattern: ecs-fargate
 
 basePath: {{BASE_PATH}}                     # [REQUIRED] e.g. /cp/dga/demo — services use this as {base}
 
+placement:                                  # [optional] which network.yaml subnet tier each part uses
+  services: {{container | private}}         # [optional: container] ECS tasks run here (falls back to private if no container tier)
+
 services:                                   # [REQUIRED] at least 1
   - name: {{NAME}}                          # [REQUIRED] kebab-case, unique
     type: {{api | frontend | worker}}       # [REQUIRED]

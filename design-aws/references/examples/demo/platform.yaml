@@ -5,6 +5,9 @@ pattern: ecs-fargate
 
 basePath: /cp/dga/demo
 
+placement:
+  services: container            # ECS tasks run in the network's "container" tier (100.64.x)
+
 services:
   - name: api
     type: api

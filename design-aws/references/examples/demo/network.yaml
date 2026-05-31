@@ -1,5 +1,9 @@
 # Project: demo — networks defined once, mapped per environment.
 # dev / sit / uat share ONE existing VPC; prod builds its own.
+#
+# Two CIDR blocks:
+#   primary   10.30.0.0/16   → public + private (routable)
+#   secondary 100.64.0.0/16  → container + db   (high-density / non-routable)
 
 networks:
 
@@ -7,18 +11,22 @@ networks:
     mode: existing
     existing:
       vpcId: vpc-0nonprod00000001
-      publicSubnetIds:
-        - subnet-0np-pub1
-        - subnet-0np-pub2
-      privateSubnetIds:
-        - subnet-0np-pri1
-        - subnet-0np-pri2
+      publicSubnetIds:    [subnet-0np-pub1, subnet-0np-pub2]
+      privateSubnetIds:   [subnet-0np-pri1, subnet-0np-pri2]
+      containerSubnetIds: [subnet-0np-con1, subnet-0np-con2]
+      dbSubnetIds:        [subnet-0np-db1,  subnet-0np-db2]
 
   prod:                          # ← prod creates its own dedicated VPC
     mode: create
     create:
-      cidr: 10.30.0.0/16
-      maxAzs: 2
+      cidrs:
+        primary:   10.30.0.0/16        # public + private
+        secondary: 100.64.0.0/16       # container + db
+      subnets:                         # one CIDR per AZ (2 entries → 2 AZs)
+        public:    [10.30.0.0/24,    10.30.1.0/24]
+        private:   [10.30.10.0/24,   10.30.11.0/24]
+        container: [100.64.0.0/18,   100.64.64.0/18]    # /18 each — room for many tasks
+        db:        [100.64.128.0/24, 100.64.129.0/24]
       natGateways: 2
 
 environments:                    # which network each env uses
