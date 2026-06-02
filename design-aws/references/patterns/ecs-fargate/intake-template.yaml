@@ -1,0 +1,209 @@
+# ============================================================
+#  ECS Fargate — Requirement Intake Template
+#
+#  How to use:
+#    1. Copy this file -> fill in values replacing <placeholder> -> delete unused blocks
+#    2. Submit the filled file to the design-aws skill
+#    3. The agent reads it and checks completeness/consistency via reasoning
+#       (see "Intake review" at the end of this file)
+#       *No validator script* — correctness relies on the comments here + checklist.md/defaults.md
+#
+#  Legend (how mandatory each field is):
+#    [required]            = always required
+#    [optional]            = may omit (deletable / has a default)
+#    [required if <cond>]  = required when the condition holds
+#    [derived]             = the skill computes it; no need to fill (fill only to override)
+#
+#  <...>          = fill in
+#  # options: a|b = allowed enum values
+# ============================================================
+schemaVersion: 1                   # [required] template schema version
+pattern: ecs-fargate               # [required] keep this value
+
+# ── 1. Project & Environments ───────────────────────────────
+# One project can have multiple envs; tier drives derive policy (sizing/waf/log/nat)
+project:
+  name: <app-name>                 # [required] prefix for every resource (lowercase, a-z0-9-)
+  env:                             # [required] at least 1 env
+    - name: <env-name>             # [required] e.g. sit | uat | dev | staging
+      tier: <tier>                 # [required] options: non-prod | pre-prod | prod
+      account: "<aws-account-id>"  # [required] 12 digits (always quote)
+      region: <region>             # [required] e.g. ap-southeast-7 | ap-southeast-1
+      domain: <fqdn>               # [required] domain for this env, e.g. app-uat.example.com
+    # - name: prod                 # [optional] add more envs as needed
+    #   tier: prod
+    #   account: "<aws-account-id>"
+    #   region: <region>
+    #   domain: <fqdn>
+
+# ── 2. Networking ───────────────────────────────────────────
+networking:
+  # [optional] [ADDITIONAL] Transit Gateway — NOT in the baseline.
+  # Add only when the workload must reach an on-prem/office network or peer VPCs.
+  # Pairs with: gateways.tgw, gateways.nat-private, and a 10.0.0.0/8 route in private/container subnets.
+  # If not using TGW: delete this whole block (and tgw / nat-private below).
+  transitGateway:
+    name: <tgw-name>               # [required if transitGateway] referenced by gateways.tgw.ref
+    type: create                   # [required if transitGateway] options: create | existing
+    # tgwId: <tgw-xxxx>            # [required if type=existing]
+    account: "<aws-account-id>"    # [required if transitGateway]
+    region: <region>               # [required if transitGateway]
+    vpn:                           # [optional] Site-to-Site VPN terminated at the TGW (delete if no office link)
+      name: <vpn-name>             # [required if vpn]
+      customerGateway: <cgw-name>  # [required if vpn] office-side device (e.g. Palo Alto)
+      # office advertises <office-cidr> ; AWS advertises <vpc-primary-cidrs>
+    attachments:                   # [required if transitGateway] VPCs attached (ENI placed in private subnet)
+      - { tier: <tier>, subnet: private }
+
+  # [required] network definition per tier (1 VPC per tier). tier must match project.env[].tier
+  tiers:
+    <tier>:                        # [required] e.g. non-prod
+      vpcName: <vpc-name>          # [required]
+      vpcCidr: <primary-cidr>      # [required if type=create] office-routable range, e.g. 10.x.x.0/24
+      secondaryCidr: <secondary-cidr>   # [optional] containers/db, e.g. 100.64.0.0/16 (CGNAT)
+      type: create                 # [required] options: create | existing
+      # vpcId: <vpc-xxxx>          # [required if type=existing]
+      gateways:                    # [required] declare every gateway -> routes.target reference these keys
+        igw:                       # [required] internet gateway (needed by ALB/public)
+          type: internet-gateway
+        tgw:                       # [ADDITIONAL] only if using TGW (office link) — delete in baseline
+          type: transit-gateway
+          ref: <tgw-name>          # [required if tgw] must match networking.transitGateway.name
+        # vgw:                     # [optional] use instead of tgw when VPN attaches directly to the VPC
+        #   type: vpn-gateway
+        nat-public:                # [optional] internet egress (has EIP) — delete if containers need no egress
+          type: nat
+          connectivity: public     # options: public | private
+          strategy: <nat-strategy> # [required if nat] options: single | one-per-az
+          subnet: public
+        nat-private:               # [ADDITIONAL] office return path (no EIP) — delete in baseline
+          type: nat
+          connectivity: private
+          strategy: <nat-strategy> # [required if nat-private]
+          subnet: private          # SNAT secondary-cidr -> IP in private subnet (routable range)
+      subnets:                     # [required] cidrs is a list per AZ (item count = number of AZs)
+        public:                    # [required] ALB, NAT GW
+          cidrs: [<public-az-a>, <public-az-b>]
+          routes:                  # [required]
+            - { dest: 0.0.0.0/0, target: igw }
+        private:                   # [optional] TGW/VPN attachment + private NAT
+          cidrs: [<private-az-a>, <private-az-b>]
+          routes:
+            - { dest: <office-cidr>, target: tgw }       # or vgw if not using TGW
+        container:                 # [required] ECS tasks (secondary CIDR)
+          cidrs: [<container-az-a>, <container-az-b>]
+          routes:
+            - { dest: 0.0.0.0/0, target: nat-public }    # [optional] internet egress
+            - { dest: <office-cidr>, target: nat-private } # [optional] to office (return path)
+        database:                  # [optional] delete if no data service in the VPC
+          isolated: true           # isolated = must NOT have a 0.0.0.0/0 route
+          cidrs: [<db-az-a>, <db-az-b>, <db-az-c>]       # database tier often spans 3 AZs
+          routes:
+            - { dest: <office-cidr>, target: nat-private } # [optional] only if DB must reach office
+    # prod:                        # [optional] add a prod tier (often nat one-per-az, separate CIDR)
+    #   ...
+
+# ── 3. Platform — components that ship with ecs-fargate (ingress + compute) ──
+# baseline: ecs/ecr/alb always on ; cloudfront/waf/dns are toggleable
+# ingress chain: cloudfront -> waf -> alb -> ecs
+platform:
+  tiers:
+    <tier>:                                                          # [required]
+      ecs:        { enabled: true, containerInsights: <bool> }       # [required] baseline (containerInsights [optional])
+      ecr:        { enabled: true, mutability: <mut>, shared: <bool> } # [required] mut: IMMUTABLE|MUTABLE
+      alb:        { enabled: true, scheme: <scheme>, sslPolicy: <ssl-policy> } # [required] scheme: internet-facing|internal
+      cloudfront: { enabled: <bool> }                                # [optional]
+      waf:        { enabled: <bool> }                                # [optional] add mode/rateLimit when enabled=true
+      # waf:      { enabled: true, mode: <waf-mode>, rateLimit: <n> } # [required if waf.enabled] mode: block|count
+      dns:        { enabled: <bool>, provider: <dns-provider> }      # [optional] e.g. cloudflare | route53
+
+# ── 4. Data services — optional add-ons (delete unused blocks) ──
+# Whole section [optional] ; per-tier differences use tier keys ; resource names derive: {app}-{env}-xxx
+dataServices:
+  elasticache:                     # Redis/Valkey
+    enabled: <bool>                # [required if block present]
+    engine: <engine>               # [required if enabled] options: valkey | redis
+    port: 6379                     # [optional]
+    subnet: database               # [optional]
+    nodeType:                      # [required if enabled] differs per tier
+      <tier>: <node-type>          # e.g. cache.t4g.micro | cache.t4g.medium
+  redshift:                        # data warehouse
+    enabled: <bool>                # [required if block present]
+    type: serverless               # [required if enabled] options: serverless | provisioned
+    databaseName: <db-name>        # [required if enabled]
+    port: 5439                     # [optional]
+    subnet: database               # [optional]
+    firehose:                      # [optional] Kinesis Firehose -> Redshift + S3 backup
+      enabled: <bool>
+      backupBucket: <bool>
+    analysis:                      # [optional] EventBridge Scheduler -> Lambda -> Redshift Data API
+      enabled: <bool>
+      schedule: cron
+  documentdb:                      # MongoDB Atlas (PrivateLink) or DocumentDB
+    enabled: <bool>                # [required if block present]
+    via: privatelink               # [required if enabled] options: privatelink (Atlas) | native (DocumentDB)
+    endpointType: interface        # [optional]
+    port: 27017                    # [optional]
+    subnet: database               # [optional]
+    crossAccount: <bool>           # [required if via=privatelink] true if Atlas external
+    # endpointServiceName: <...>   # [required if via=privatelink] before deploy (from Atlas console)
+  s3:
+    enabled: <bool>                # [required if block present]
+    purpose: <purpose>             # [required if enabled] e.g. firehose-backup | assets | upload
+  sqs:
+    enabled: <bool>                # [required if block present]
+    # visibilityTimeout: 30        # [optional]
+    # deadLetterQueue: true        # [optional]
+
+# ── 5. Services — workloads on ECS Fargate (path-based routing via ALB) ──
+# [required] at least 1 service
+# cpu/memory/desiredCount = prod baseline ; other tiers derive automatically (see end of file)
+# type: api | frontend | worker   (worker has no path/health)
+#   api      -> ALB target, CloudFront cache disabled
+#   frontend -> ALB target, CloudFront cache optimized
+#   worker   -> no ALB target / CloudFront behavior
+# per-service fields:
+#   name         [required]
+#   type         [required] api | frontend | worker
+#   port         [required]
+#   runtime      [required] dotnet | go | node | python | angular | ...
+#   path         [required if type != worker]
+#   health       [required if type != worker]
+#   cpu/memory   [required] (prod baseline)
+#   desiredCount [required] (prod baseline)
+#   obs          [optional] { dashboard, alarms } default true ; alarms materialize on prod only
+services:
+  - { name: <service-name>, type: api,      port: <port>, runtime: <runtime>, health: /health, path: /<base>/api/*, cpu: <cpu>, memory: <mem>, desiredCount: <n>, obs: { dashboard: true, alarms: true } }
+  - { name: <service-name>, type: frontend, port: <port>, runtime: <runtime>, health: /health, path: /<base>/*,     cpu: <cpu>, memory: <mem>, desiredCount: <n>, obs: { dashboard: true, alarms: true } }
+  # - { name: <worker-name>, type: worker,   port: <port>, runtime: <runtime>, cpu: <cpu>, memory: <mem>, desiredCount: <n>, obs: { dashboard: true, alarms: false } }
+
+# ── 6. Observability — tier-level policy ──
+observability:
+  logRetention:                    # [required] days (e.g. non-prod 7 | pre-prod 30 | prod 90)
+    <tier>: <days>
+
+# ============================================================
+#  Reference: per-tier derive policy (the skill handles this; no need to fill)
+# ============================================================
+# compute:  non-prod cpu=max(256,prod/2) mem=max(512,prod/2) desired=1 max=1 exec=true
+#           pre-prod cpu=prod mem=prod desired=1 max=2 exec=false
+#           prod     cpu=input mem=input desired=2 max=4 exec=false
+# domain:   uses the domain filled in project.env[].domain (1 domain per env)
+# names:    resources named {app}-{env}-<resource> ; shared ECR uses {app}-{service}
+#
+# ============================================================
+#  Intake review (for the design-aws agent — reasoning, not a script)
+# ============================================================
+# When a filled file is received, check the following before Step 2:
+#  1. Completeness: every [required] has a value ; [required if ...] is present when its condition holds
+#     (e.g. transitGateway present -> name/type/account/attachments ; waf.enabled -> mode/rateLimit ;
+#      dataService.enabled -> that service's config ; type!=worker -> path/health)
+#  2. Values fall within the enums noted in the comments (tier, engine, scheme, mutability, nat strategy, etc.)
+#  3. Architectural consistency (cross-reference):
+#     - tier under networking/platform/observability matches project.env[].tier
+#     - every routes[].target references a gateway declared in gateways (no dangling target)
+#     - gateways.tgw.ref matches transitGateway.name
+#     - a subnet with isolated: true must NOT have a 0.0.0.0/0 route
+#     - when using TGW, each tier's gateways should include tgw and transitGateway.attachments should cover that tier
+#  4. Cross-check against the pattern's checklist.md + defaults.md for sane values
+#  5. Summarize as a table: complete / missing / conflicting -> if missing, ask only for those items, not everything again

@@ -1,0 +1,199 @@
+# ============================================================
+#  ECS Fargate — Intake EXAMPLE (ADDITIONAL: office connectivity)
+#
+#  Shows the baseline PLUS the optional add-ons: multi-env (non-prod + prod),
+#  shared Transit Gateway with Site-to-Site VPN, private NAT return path to office,
+#  and data services. Use this when the workload must reach an on-prem/office network.
+#
+#  For the plain starting point (no TGW/VPN, no data services), see intake-example.yaml.
+#
+#  All values are DUMMY (account 111122223333, example.com). Do not copy real
+#  account IDs / domains from here. Use this as a reference for shape & consistency;
+#  fill intake-template.yaml for a real project.
+# ============================================================
+schemaVersion: 1
+pattern: ecs-fargate
+
+# ── 1. Project & Environments ───────────────────────────────
+# sit + uat share the non-prod tier (same VPC); prod is its own tier.
+project:
+  name: acme
+  env:
+    - name: sit
+      tier: non-prod
+      account: "111122223333"
+      region: ap-southeast-7
+      domain: acme-sit.example.com
+    - name: uat
+      tier: non-prod
+      account: "111122223333"
+      region: ap-southeast-7
+      domain: acme-uat.example.com
+    - name: prod
+      tier: prod
+      account: "111122223333"
+      region: ap-southeast-7
+      domain: acme.example.com
+
+# ── 2. Networking ───────────────────────────────────────────
+networking:
+  # Shared TGW connecting non-prod + prod VPCs; VPN terminates here.
+  transitGateway:
+    name: acme-tgw
+    type: create
+    account: "111122223333"
+    region: ap-southeast-7
+    vpn:
+      name: acme-tgw-vpn
+      customerGateway: acme-cgw-onprem   # office-side device
+    attachments:
+      - { tier: non-prod, subnet: private }
+      - { tier: prod, subnet: private }
+
+  tiers:
+    non-prod:
+      vpcName: acme-nonprod-vpc
+      vpcCidr: 10.10.0.0/24
+      secondaryCidr: 100.64.0.0/16
+      type: create
+      gateways:
+        igw:
+          type: internet-gateway
+        tgw:
+          type: transit-gateway
+          ref: acme-tgw
+        nat-public:
+          type: nat
+          connectivity: public
+          strategy: single             # non-prod = cheaper single NAT
+          subnet: public
+        nat-private:
+          type: nat
+          connectivity: private
+          strategy: single
+          subnet: private
+      subnets:
+        public:
+          cidrs: [10.10.0.0/26, 10.10.0.64/26]
+          routes:
+            - { dest: 0.0.0.0/0, target: igw }
+        private:
+          cidrs: [10.10.0.128/26, 10.10.0.192/26]
+          routes:
+            - { dest: 10.0.0.0/8, target: tgw }            # office (VPN) + peer VPC via TGW
+        container:
+          cidrs: [100.64.0.0/19, 100.64.32.0/19]
+          routes:
+            - { dest: 0.0.0.0/0, target: nat-public }
+            - { dest: 10.0.0.0/8, target: nat-private }    # return path to office
+        database:
+          isolated: true
+          cidrs: [100.64.64.0/19, 100.64.96.0/19, 100.64.128.0/19]
+          routes:
+            - { dest: 10.0.0.0/8, target: nat-private }
+    prod:
+      vpcName: acme-prod-vpc
+      vpcCidr: 10.10.1.0/24
+      secondaryCidr: 100.64.0.0/16
+      type: create
+      gateways:
+        igw:
+          type: internet-gateway
+        tgw:
+          type: transit-gateway
+          ref: acme-tgw
+        nat-public:
+          type: nat
+          connectivity: public
+          strategy: one-per-az         # prod = HA NAT
+          subnet: public
+        nat-private:
+          type: nat
+          connectivity: private
+          strategy: one-per-az
+          subnet: private
+      subnets:
+        public:
+          cidrs: [10.10.1.0/26, 10.10.1.64/26]
+          routes:
+            - { dest: 0.0.0.0/0, target: igw }
+        private:
+          cidrs: [10.10.1.128/26, 10.10.1.192/26]
+          routes:
+            - { dest: 10.0.0.0/8, target: tgw }
+        container:
+          cidrs: [100.64.0.0/19, 100.64.32.0/19]
+          routes:
+            - { dest: 0.0.0.0/0, target: nat-public }
+            - { dest: 10.0.0.0/8, target: nat-private }
+        database:
+          isolated: true
+          cidrs: [100.64.64.0/19, 100.64.96.0/19, 100.64.128.0/19]
+          routes:
+            - { dest: 10.0.0.0/8, target: nat-private }
+
+# ── 3. Platform ─────────────────────────────────────────────
+platform:
+  tiers:
+    non-prod:
+      ecs:        { enabled: true, containerInsights: true }
+      ecr:        { enabled: true, mutability: IMMUTABLE, shared: true }
+      alb:        { enabled: true, scheme: internet-facing, sslPolicy: ELBSecurityPolicy-TLS13-1-2-2021-06 }
+      cloudfront: { enabled: true }
+      waf:        { enabled: false }                       # non-prod off
+      dns:        { enabled: true, provider: cloudflare }
+    prod:
+      ecs:        { enabled: true, containerInsights: true }
+      ecr:        { enabled: true, mutability: IMMUTABLE, shared: true }
+      alb:        { enabled: true, scheme: internet-facing, sslPolicy: ELBSecurityPolicy-TLS13-1-2-2021-06 }
+      cloudfront: { enabled: true }
+      waf:        { enabled: true, mode: count, rateLimit: 2000 }   # prod on
+      dns:        { enabled: true, provider: cloudflare }
+
+# ── 4. Data services ────────────────────────────────────────
+dataServices:
+  elasticache:
+    enabled: true
+    engine: valkey
+    port: 6379
+    subnet: database
+    nodeType:
+      non-prod: cache.t4g.micro
+      prod: cache.t4g.medium
+  redshift:
+    enabled: true
+    type: serverless
+    databaseName: acme-redshift
+    port: 5439
+    subnet: database
+    firehose:
+      enabled: true
+      backupBucket: true
+    analysis:
+      enabled: true
+      schedule: cron
+  documentdb:
+    enabled: true
+    via: privatelink
+    endpointType: interface
+    port: 27017
+    subnet: database
+    crossAccount: true
+  s3:
+    enabled: true
+    purpose: firehose-backup
+  sqs:
+    enabled: false
+
+# ── 5. Services — one per group (gateway / api / web) ───────
+# cpu/memory/desiredCount = prod baseline; other tiers derive automatically.
+services:
+  - { name: gateway-auth, type: api,      port: 8000, runtime: go,      health: /health, path: /gateway/auth/*, cpu: 2048, memory: 4096, desiredCount: 2, obs: { dashboard: true, alarms: true } }
+  - { name: orders-api,   type: api,      port: 5000, runtime: dotnet,  health: /health, path: /orders/api/*,   cpu: 2048, memory: 4096, desiredCount: 2, obs: { dashboard: true, alarms: true } }
+  - { name: orders-web,   type: frontend, port: 8000, runtime: angular, health: /health, path: /orders/*,       cpu: 2048, memory: 4096, desiredCount: 2, obs: { dashboard: true, alarms: true } }
+
+# ── 6. Observability ────────────────────────────────────────
+observability:
+  logRetention:
+    non-prod: 7
+    prod: 90

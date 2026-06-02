@@ -1,0 +1,80 @@
+# ============================================================
+#  ECS Fargate — Intake EXAMPLE (BASELINE / starting point)
+#
+#  The minimal, valid ecs-fargate intake: a single env, one VPC with igw + NAT,
+#  the baseline platform (ecs/ecr/alb), no data services, one service per group
+#  (gateway/api/web). This is the usual starting point — add things from here.
+#
+#  Common add-ons (see intake-example-tgw.yaml for a worked example):
+#    - office connectivity: transitGateway + vpn + nat-private + private-subnet route
+#    - more envs / a prod tier
+#    - data services (elasticache / redshift / documentdb / s3 / sqs) + database subnet
+#    - cloudfront / waf / dns
+#
+#  All values are DUMMY (account 111122223333, example.com). Do not copy real
+#  account IDs / domains. Fill intake-template.yaml for a real project.
+# ============================================================
+schemaVersion: 1
+pattern: ecs-fargate
+
+# ── 1. Project & Environments ───────────────────────────────
+project:
+  name: acme
+  env:
+    - name: dev
+      tier: non-prod
+      account: "111122223333"
+      region: ap-southeast-7
+      domain: acme-dev.example.com
+
+# ── 2. Networking — baseline (igw + NAT, no TGW/VPN) ────────
+networking:
+  tiers:
+    non-prod:
+      vpcName: acme-nonprod-vpc
+      vpcCidr: 10.10.0.0/24
+      secondaryCidr: 100.64.0.0/16
+      type: create
+      gateways:
+        igw:
+          type: internet-gateway
+        nat-public:
+          type: nat
+          connectivity: public
+          strategy: single
+          subnet: public
+      subnets:
+        public:                     # ALB, NAT GW
+          cidrs: [10.10.0.0/26, 10.10.0.64/26]
+          routes:
+            - { dest: 0.0.0.0/0, target: igw }
+        container:                  # ECS tasks (secondary CIDR)
+          cidrs: [100.64.0.0/19, 100.64.32.0/19]
+          routes:
+            - { dest: 0.0.0.0/0, target: nat-public }
+
+# ── 3. Platform — baseline (ecs/ecr/alb) ────────────────────
+platform:
+  tiers:
+    non-prod:
+      ecs:        { enabled: true, containerInsights: false }
+      ecr:        { enabled: true, mutability: IMMUTABLE, shared: true }
+      alb:        { enabled: true, scheme: internet-facing, sslPolicy: ELBSecurityPolicy-TLS13-1-2-2021-06 }
+      cloudfront: { enabled: false }
+      waf:        { enabled: false }
+      dns:        { enabled: true, provider: cloudflare }
+
+# ── 4. Data services — none in baseline ─────────────────────
+# (add elasticache / redshift / documentdb / s3 / sqs here when needed,
+#  plus a `database` subnet in networking)
+
+# ── 5. Services — one per group (gateway / api / web) ───────
+services:
+  - { name: gateway-auth, type: api,      port: 8000, runtime: go,      health: /health, path: /gateway/auth/*, cpu: 1024, memory: 2048, desiredCount: 1, obs: { dashboard: true, alarms: false } }
+  - { name: orders-api,   type: api,      port: 5000, runtime: dotnet,  health: /health, path: /orders/api/*,   cpu: 1024, memory: 2048, desiredCount: 1, obs: { dashboard: true, alarms: false } }
+  - { name: orders-web,   type: frontend, port: 8000, runtime: angular, health: /health, path: /orders/*,       cpu: 1024, memory: 2048, desiredCount: 1, obs: { dashboard: true, alarms: false } }
+
+# ── 6. Observability ────────────────────────────────────────
+observability:
+  logRetention:
+    non-prod: 7
