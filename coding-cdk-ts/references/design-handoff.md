@@ -93,14 +93,29 @@ for (const svc of props.config.services) {
     logging: ecs.LogDrivers.awsLogs({ streamPrefix: svc.name }),
   });
 
-  new ecs.FargateService(this, `${svc.name}Service`, {
+  const family = `${props.config.prefix}-ecs-${svc.name}`;
+  const service = new ecs.FargateService(this, `${svc.name}Service`, {
     cluster,
-    taskDefinition: taskDef,
+    taskDefinition: taskDef,            // bootstrap task def (used on first create only)
     desiredCount: props.config.containerSpec.desiredCount,
-    serviceName: `${props.config.prefix}-ecs-${svc.name}`,
+    serviceName: family,
   });
+
+  // CI (GitHub Actions) owns the task def revision (image git-sha + secrets).
+  // Reference the task def by family -> CloudFormation always uses the latest
+  // ACTIVE revision, so cdk deploy (e.g. an IAM role change) won't revert the
+  // revision deployed by CI.
+  // L2 doesn't expose family-only references -> use an escape hatch (L2-First rule).
+  const cfnService = service.node.defaultChild as ecs.CfnService;
+  cfnService.addPropertyOverride('TaskDefinition', family);
+  service.node.addDependency(taskDef); // preserve first-deploy ordering (Ref dependency is overridden away)
 }
 ```
+
+> **Task definition ownership (CI vs CDK)**
+> - ✅ Reference the task def by **family** when CI/CD (GitHub Actions) deploys the revision (image + secrets).
+> - ✅ Verify `cdk diff` is **in-place** before deploy — no replace/revert of `AWS::ECS::Service`.
+> - ❌ Don't pin a revision (passing `taskDefinition: taskDef` without the override) when CI owns the revision — every `cdk deploy` (even just an IAM role change) reconciles the service back to the CDK task def and reverts CI's image/secrets.
 
 ---
 
