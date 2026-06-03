@@ -30,6 +30,8 @@ project:
       account: "<aws-account-id>"  # [required] 12 digits (always quote)
       region: <region>             # [required] e.g. ap-southeast-7 | ap-southeast-1
       domain: <fqdn>               # [required] domain for this env, e.g. app-uat.example.com
+      # overrides:                 # [optional] this env differs from its tier — patch ONLY what changes (tier is the base)
+      #   platform: { waf: { enabled: true } }   # e.g. uat enables WAF while dev/sit don't
     # - name: prod                 # [optional] add more envs as needed
     #   tier: prod
     #   account: "<aws-account-id>"
@@ -214,5 +216,6 @@ observability:
 #     - alb.type=existing -> albArn + listenerArn present ; acm.type=existing -> arn present
 #     - acm.domain (wildcard) must cover every env domain served by that ALB
 #     - platform.placement.services tier must exist in each tier's subnets
+#     - env.overrides (if any) patches that env's resolved config (tier is the base); keep it minimal — marks intra-group differences (e.g. uat WAF)
 #  4. Cross-check against the pattern's checklist.md + defaults.md for sane values
 #  5. Summarize as a table: complete / missing / conflicting -> if missing, ask only for those items, not everything again

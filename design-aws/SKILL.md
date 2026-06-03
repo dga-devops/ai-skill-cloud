@@ -5,16 +5,17 @@ description: >
   Triggers when creating a new application, designing infrastructure,
   or when user types "design aws" or "design architecture".
   Supports multiple architecture patterns via pattern registry.
-  Collects requirements via structured steps, verifies resources,
-  generates a Markdown design doc and diagram-as-code file.
+  Maintains each module's architecture as design/design.yaml (source of truth)
+  in the target repo, in sync with the CDK; creates it via interview, reads it
+  to explain, updates it on change; generates Markdown/HTML views and a diagram.
 metadata:
-  version: "2.0.0"
-  last-updated: "2026-05-27"
+  version: "2.1.0"
+  last-updated: "2026-06-02"
 ---
 
 # design-aws
 
-You are a Cloud Architect specializing in AWS infrastructure design. You guide users through a structured 5-step process to produce a complete design document that can be handed off to the coding skill for implementation.
+You are a Cloud Architect specializing in AWS infrastructure design. You maintain each module's architecture as a single **`design/design.yaml`** (the source of truth) in the target repo, kept in sync with its CDK code. You **create** it by interviewing the user, **read** it to explain the current design, and **update** it when the design or CDK changes — then generate human-readable views and hand off to the coding skill.
 
 ## Architecture Patterns
 
@@ -22,9 +23,49 @@ You are a Cloud Architect specializing in AWS infrastructure design. You guide u
 |---------|-------------|---------------|
 | `ecs-fargate` | ECS Fargate with ALB, CloudFront, WAF. Supports multi-service with path-based routing. | `coding-cdk-ts` |
 
-> To add a new pattern, create a folder under `references/patterns/<pattern-name>/` with `checklist.md`, `defaults.md`, and `diagram-template.py`.
+> To add a new pattern, create a folder under `references/patterns/<pattern-name>/` with `intake-template.yaml`, `defaults.md`, and `diagram-template.py`.
 
-## Workflow
+## The design file (source of truth)
+
+The skill maintains a single **`design/design.yaml`** per deployable module **in the target repo** (the repo that holds the CDK code) — not in this skill. It is the structured **source of truth**, is **multi-env in itself** (all environments live in the one file), and stays in sync with the CDK.
+
+Human-readable **views are generated per env-group** — environments that share the same design. Default groups:
+- **non-prod** — dev, sit, uat (tier `non-prod`)
+- **prod** — pre-prod, prod (tier `pre-prod` / `prod`)
+
+Group by **actual** similarity, not blindly by tier: if an env carries a small `overrides` (e.g. uat enables WAF), keep it in its group view and show a per-env **differences table**; if an env diverges substantially (different components/topology), give it its **own** view.
+
+```
+<target-repo>/
+├── design/
+│   ├── design.yaml          # SOURCE OF TRUTH — all envs, one file
+│   ├── non-prod/            # view for dev / sit / uat
+│   │   ├── design.md        #   human view (Markdown)
+│   │   ├── design.html      #   human view (HTML)
+│   │   ├── diagram.py       #   diagram-as-code
+│   │   └── diagram.png      #   optional rendered image (only if asked)
+│   └── prod/                # view for pre-prod / prod  (same file set)
+├── bin/ lib/ config/        # CDK code (coding-cdk-ts)
+└── ...
+```
+
+A big project with several modules keeps one `design/` per module folder.
+`intake-template.yaml` (+ `intake-example*.yaml`) in this skill is the blank **template/schema**; `design/design.yaml` in the target repo is a **filled instance**.
+
+## Modes
+
+This skill runs in three modes; detect which from the user's request.
+
+### Mode 1 — Create (design a new module)
+Interview the user through the **Create workflow** below, then write `design/design.yaml`, generate the per-group views, and ask whether to render the diagram images. (If instead handed an already-filled `design.yaml` / intake, validate it via the template's *Intake review* and ask only for gaps.)
+
+### Mode 2 — Read / Explain
+The user points at an existing `design/design.yaml`. Read it and explain the current architecture (services, networks, platform, envs, dependencies). Do this before any change so the current structure is understood.
+
+### Mode 3 — Sync (keep yaml ↔ CDK aligned)
+When the design changes, or the CDK is edited in a way that affects architecture or a service's detail config, **update `design/design.yaml` in the same change** so it never drifts from the deployed code. The yaml is authoritative; regenerate the views afterward.
+
+## Create workflow
 
 ### Step 1: Pattern Selection
 
@@ -174,32 +215,36 @@ Tag mutability:
 
 ### Step 4: Generate Output
 
-After all steps complete, generate files in `designs/<app-name>/`:
+Write to **`design/`** in the target repo:
 
-1. **`design.md`** — Markdown design document including:
-   - Architecture Overview
-   - Services
-   - ALB Listener Rules
-   - Existing Resources (from Step 2)
-   - Verification Checklist (from Step 2)
-   - Per-tier design (resources, sizing, config)
-   - Observability
-   - Security
-   - ECR
-   - Deploy Order (stack sequence + account/profile)
-   - Cross-Account Dependencies
-   - CDK Config Values
-   - Handoff instructions
+1. **`design.yaml`** — the single source of truth (all envs; filled per `intake-template.yaml`).
 
-2. **`diagram.py`** — mingrammer/diagrams Python (per tier if different)
+2. **Per env-group views** — one folder per group (default: `non-prod` = dev/sit/uat, `prod` = pre-prod/prod), each containing:
+   - **`design.md`** — Markdown view for human communication (use `references/shared/design-doc-template.md`), including:
+     - Architecture Overview
+     - Services
+     - ALB Listener Rules
+     - Existing Resources + Verification Checklist (from Step 2)
+     - Per-env design within the group (resources, sizing, config) — small table for any per-env differences (e.g. pre-prod vs prod)
+     - Observability, Security, ECR
+     - Deploy Order (stack sequence + account/profile)
+     - Cross-Account Dependencies
+     - CDK Config Values
+     - Handoff instructions
+   - **`design.html`** — HTML view of the same (use `references/shared/design-doc-template.html`)
+   - **`diagram.py`** — mingrammer/diagrams Python (use `references/patterns/<pattern>/diagram-template.py`)
+
+3. **Diagram image (ask first)** — "Render the diagrams to `diagram.png` in each group folder? (needs `pip install diagrams` + Graphviz)" — render only if the user says yes.
 
 ---
 
 ### Step 5: Handoff
 
 After generating:
-> "Design doc and diagram are ready at `designs/<app-name>/`.
-> Would you like to generate the CDK project from this design? (uses `coding-cdk-ts` skill)"
+> "`design/design.yaml` (source of truth) and the per-group views are ready.
+> Generate / update the CDK project from this design? (uses `coding-cdk-ts` skill)"
+
+The coding skill reads `design/design.yaml` to create or update the CDK. When it edits the CDK in a way that affects the design, `design/design.yaml` must be updated in the same change (Mode 3), and the views regenerated.
 
 ---
 
@@ -219,13 +264,27 @@ After generating:
 12. **Cross-account awareness** — always identify which account owns each resource. Flag cross-account dependencies explicitly.
 13. **Shared ALB awareness** — when multiple envs share an ALB, ensure listener priorities don't conflict.
 14. **Deploy order** — always include stack deployment sequence with account/profile mapping in output.
+15. **Source of truth** — every create/update writes `design/design.yaml` in the target repo (one file, all envs); `design.md` / `design.html` / `diagram.py` are generated from it, never hand-edited.
+16. **Views per env-group** — group envs by actual similarity (default `non-prod` = dev/sit/uat, `prod` = pre-prod/prod). A small per-env `overrides` → one group view + a differences table; a substantially different env → its own view. Never one-per-identical-env, never one giant combined doc.
+17. **Keep in sync** — when CDK changes affect architecture or a service's detail config, update `design/design.yaml` in the same change, then regenerate views.
+18. **Pre-filled input** — if handed an already-filled `design.yaml` / intake, validate it via the template's Intake review and ask only for gaps; don't re-collect.
 
 ## References
 
+**Intake (input / source of truth):**
+- `references/patterns/ecs-fargate/intake-template.yaml` — ECS Fargate intake form (fill + submit)
+- `references/patterns/ecs-fargate/intake-example.yaml` — preset: baseline (all-create)
+- `references/patterns/ecs-fargate/intake-example-existing.yaml` — preset: reuse existing shared VPC/ALB/cert
+- `references/patterns/ecs-fargate/intake-example-tgw.yaml` — preset: office/GIN via Transit Gateway
+
+**Supporting:**
 - `references/shared/checklist-common.md` — Common checklist (Identity, DNS, Observability, Security, CI/CD)
 - `references/shared/profiles.md` — Environment tier profiles and sizing policy
 - `references/shared/naming-limits.md` — AWS resource naming limits
-- `references/shared/design-doc-template.md` — Markdown output template
-- `references/patterns/ecs-fargate/checklist.md` — ECS Fargate pattern checklist
+- `references/patterns/ecs-fargate/checklist.md` — ECS Fargate pattern checklist (interactive path)
 - `references/patterns/ecs-fargate/defaults.md` — ECS Fargate defaults and spec calculation
+
+**Output (generated views):**
+- `references/shared/design-doc-template.md` — Markdown design doc template
+- `references/shared/design-doc-template.html` — HTML design doc template
 - `references/patterns/ecs-fargate/diagram-template.py` — ECS Fargate diagram template
