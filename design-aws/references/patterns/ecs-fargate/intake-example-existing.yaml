@@ -6,8 +6,8 @@
 #  VPC + ALB + cert.
 #
 #  Shows: networking type=existing (subnet ids, no gateways/routes), alb type=existing,
-#  acm type=existing wildcard, placement (ECS tasks in the container tier), and a
-#  prod tier that creates everything fresh.
+#  acm type=existing wildcard, placement (ECS tasks in the container tier), a per-env
+#  override (uat enables WAF while dev/sit don't), and a prod tier that creates fresh.
 #
 #  For the plain all-create starting point see intake-example.yaml;
 #  for office/GIN connectivity see intake-example-tgw.yaml.
@@ -19,12 +19,19 @@ pattern: ecs-fargate
 
 # ── 1. Project & Environments ───────────────────────────────
 # dev/sit/uat share the non-prod tier (same VPC/ALB/cert); prod is its own tier.
+# uat overrides its tier to enable WAF — demonstrates a per-env override (dev != uat).
 project:
   name: demo
   env:
     - { name: dev,  tier: non-prod, account: "111100001111", region: ap-southeast-1, domain: demo-dev.nonprod.dga.local }
     - { name: sit,  tier: non-prod, account: "111100001111", region: ap-southeast-1, domain: demo-sit.nonprod.dga.local }
-    - { name: uat,  tier: non-prod, account: "111100001111", region: ap-southeast-1, domain: demo-uat.nonprod.dga.local }
+    - name: uat
+      tier: non-prod
+      account: "111100001111"
+      region: ap-southeast-1
+      domain: demo-uat.nonprod.dga.local
+      overrides:                       # uat differs from dev/sit — enable WAF on top of the non-prod tier
+        platform: { waf: { enabled: true, mode: count, rateLimit: 2000 } }
     - { name: prod, tier: prod,     account: "999900009999", region: ap-southeast-1, domain: demo.dga.go.th }
 
 # ── 2. Networking ───────────────────────────────────────────
