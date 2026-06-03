@@ -55,6 +55,7 @@ Versions that all projects should use. Deployed and verified in production:
 | `@typescript-eslint/eslint-plugin` | `^7.0.0` | caret | TypeScript ESLint rules |
 | `@typescript-eslint/parser` | `^7.0.0` | caret | TypeScript ESLint parser |
 | `prettier` | `^3.2.0` | caret | Code formatter |
+| `rimraf` | `^6.0.1` | caret | Cross-platform `clean` script (with node fallback) |
 
 ### Range Strategy Guide
 
@@ -239,9 +240,26 @@ Every project must include these scripts:
     "cdk": "cdk",
     "lint": "eslint --ext .js,.ts .",
     "format": "prettier --ignore-path .gitignore --write '**/*.+(js|ts|json)'",
-    "clean": "find . -path ./node_modules -prune -o \\( -name '*.js' ! -name 'jest.config.js' -o -name '*.d.ts' \\) -type f -exec rm {} +"
+    "clean": "rimraf \"{bin,lib,config,test}/**/*.js\" \"{bin,lib,config,test}/**/*.d.ts\" || node scripts/clean.js"
   }
 }
+```
+
+> **Cross-platform `clean`**: `rimraf` is the primary cleaner (glob-capable, works on all OSes). The `|| node scripts/clean.js` fallback runs only if `rimraf` is unavailable (e.g. before `npm install`). `||` is honored by both `cmd.exe` and `sh`. The glob is scoped to `bin/lib/config/test`, so root files like `jest.config.js` are never matched.
+
+### scripts/clean.js (fallback — no dependencies, Node 14+)
+
+```js
+const fs = require('fs');
+const path = require('path');
+const walk = (dir) => {
+  if (!fs.existsSync(dir)) return;
+  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    const p = path.join(dir, e.name);
+    e.isDirectory() ? walk(p) : /\.(js|d\.ts)$/.test(e.name) && fs.rmSync(p);
+  }
+};
+['bin', 'lib', 'config', 'test'].forEach(walk);
 ```
 
 ### tsconfig.json

@@ -62,6 +62,7 @@ networking:
       vpcCidr: <primary-cidr>      # [required if type=create] office-routable range, e.g. 10.x.x.0/24
       secondaryCidr: <secondary-cidr>   # [optional] containers/db, e.g. 100.64.0.0/16 (CGNAT)
       type: create                 # [required] options: create | existing
+      # --- when type = existing: reuse a VPC; give vpcId + subnet IDs only (gateways/routes already exist, omit them) ---
       # vpcId: <vpc-xxxx>          # [required if type=existing]
       gateways:                    # [required] declare every gateway -> routes.target reference these keys
         igw:                       # [required] internet gateway (needed by ALB/public)
@@ -81,7 +82,7 @@ networking:
           connectivity: private
           strategy: <nat-strategy> # [required if nat-private]
           subnet: private          # SNAT secondary-cidr -> IP in private subnet (routable range)
-      subnets:                     # [required] cidrs is a list per AZ (item count = number of AZs)
+      subnets:                     # [required] type=create -> `cidrs` per AZ (count = #AZs) ; type=existing -> `ids: [<subnet-id>,...]` per tier
         public:                    # [required] ALB, NAT GW
           cidrs: [<public-az-a>, <public-az-b>]
           routes:                  # [required]
@@ -107,11 +108,15 @@ networking:
 # baseline: ecs/ecr/alb always on ; cloudfront/waf/dns are toggleable
 # ingress chain: cloudfront -> waf -> alb -> ecs
 platform:
+  placement: { services: container }  # [optional: container] subnet tier ECS tasks run in (container|private)
   tiers:
     <tier>:                                                          # [required]
       ecs:        { enabled: true, containerInsights: <bool> }       # [required] baseline (containerInsights [optional])
       ecr:        { enabled: true, mutability: <mut>, shared: <bool> } # [required] mut: IMMUTABLE|MUTABLE
-      alb:        { enabled: true, scheme: <scheme>, sslPolicy: <ssl-policy> } # [required] scheme: internet-facing|internal
+      alb:        { enabled: true, type: <alb-type>, scheme: <scheme>, sslPolicy: <ssl-policy> } # type: create|existing ; scheme: internet-facing|internal
+      # alb (existing): { enabled: true, type: existing, albArn: <arn>, listenerArn: <arn> }  # reuse a shared ALB (scheme/ssl come from it)
+      acm:        { type: <acm-type>, domain: <cert-domain> }        # [required] HTTPS cert for the ALB ; type: create-new|existing ; domain e.g. "*.example.com" (a wildcard is shareable across envs)
+      # acm (existing): { type: existing, arn: <acm-arn>, domain: <wildcard> }  # reuse an issued cert (shared wildcard); domain documents coverage
       cloudfront: { enabled: <bool> }                                # [optional]
       waf:        { enabled: <bool> }                                # [optional] add mode/rateLimit when enabled=true
       # waf:      { enabled: true, mode: <waf-mode>, rateLimit: <n> } # [required if waf.enabled] mode: block|count
@@ -205,5 +210,9 @@ observability:
 #     - gateways.tgw.ref matches transitGateway.name
 #     - a subnet with isolated: true must NOT have a 0.0.0.0/0 route
 #     - when using TGW, each tier's gateways should include tgw and transitGateway.attachments should cover that tier
+#     - networking type=existing -> vpcId + subnet ids present (no gateways/routes) ; type=create -> cidrs + routes
+#     - alb.type=existing -> albArn + listenerArn present ; acm.type=existing -> arn present
+#     - acm.domain (wildcard) must cover every env domain served by that ALB
+#     - platform.placement.services tier must exist in each tier's subnets
 #  4. Cross-check against the pattern's checklist.md + defaults.md for sane values
 #  5. Summarize as a table: complete / missing / conflicting -> if missing, ask only for those items, not everything again
