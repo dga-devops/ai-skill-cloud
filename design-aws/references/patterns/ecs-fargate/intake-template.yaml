@@ -114,10 +114,13 @@ networking:
 # ingress chain: cloudfront -> waf -> alb -> ecs
 platform:
   placement: { services: container }  # [optional: container] subnet tier ECS tasks run in (container|private)
+  basePath: <base-path>               # [optional: /cp/dga/<app>] shared path prefix defined once ; services reference it as {base} (single source of truth — change the prefix here only)
+  albHealthCheck: { interval: 30, healthyThreshold: 3, unhealthyThreshold: 3 }  # [optional] shared ALB target health check
   tiers:
     <tier>:                                                          # [required]
       ecs:        { enabled: true, containerInsights: <bool> }       # [required] baseline (containerInsights [optional])
       ecr:        { enabled: true, mutability: <mut>, shared: <bool> } # [required] mut: IMMUTABLE|MUTABLE
+      # ecr (override):   { ..., removalPolicy: <policy>, maxImageCount: <n> } # [derived] removalPolicy: destroy|retain (non-prod=destroy, else retain) ; maxImageCount non-prod=5 / prod=30 — fill only to override
       alb:        { enabled: true, type: <alb-type>, scheme: <scheme>, sslPolicy: <ssl-policy> } # type: create|existing ; scheme: internet-facing|internal
       # alb (existing): { enabled: true, type: existing, albArn: <arn>, listenerArn: <arn> }  # reuse a shared ALB (scheme/ssl come from it)
       acm:        { type: <acm-type>, domain: <cert-domain> }        # [required] HTTPS cert for the ALB ; type: create-new|existing ; domain e.g. "*.example.com" (a wildcard is shareable across envs)
@@ -177,14 +180,19 @@ dataServices:
 #   type         [required] api | frontend | worker
 #   port         [required]
 #   runtime      [required] dotnet | go | node | python | angular | ...
-#   path         [required if type != worker]
+#   path         [required if type != worker] use {base} for the shared prefix, e.g. {base}/api/*
 #   health       [required if type != worker]
 #   cpu/memory   [required] (prod baseline)
 #   desiredCount [required] (prod baseline)
+#   maxCount     [optional] max tasks at prod (default 4) ; min/exec are derived per tier
+#   scaling      [derived] { metric: cpu, targetPercent: 70 } — fill only to override
+#   cache        [derived] by type (api=caching-disabled, frontend=caching-optimized) — fill only to override
+#   priority     [derived] by type (api rules first, frontend is the catch-all) — fill only to override
 #   obs          [optional] { dashboard, alarms } default true ; alarms materialize on prod only
 services:
-  - { name: <service-name>, type: api,      port: <port>, runtime: <runtime>, health: /health, path: /<base>/api/*, cpu: <cpu>, memory: <mem>, desiredCount: <n>, obs: { dashboard: true, alarms: true } }
-  - { name: <service-name>, type: frontend, port: <port>, runtime: <runtime>, health: /health, path: /<base>/*,     cpu: <cpu>, memory: <mem>, desiredCount: <n>, obs: { dashboard: true, alarms: true } }
+  - { name: <service-name>, type: api,      port: <port>, runtime: <runtime>, health: /health, path: "{base}/api/*", cpu: <cpu>, memory: <mem>, desiredCount: <n>, maxCount: <n>, obs: { dashboard: true, alarms: true } }
+  - { name: <service-name>, type: frontend, port: <port>, runtime: <runtime>, health: /health, path: "{base}/*",     cpu: <cpu>, memory: <mem>, desiredCount: <n>, maxCount: <n>, obs: { dashboard: true, alarms: true } }
+  # - { name: <service-name>, type: api,    ..., scaling: { metric: cpu, targetPercent: 70 }, cache: caching-disabled, priority: 1 } # [optional] override the derived scaling/cache/priority
   # - { name: <worker-name>, type: worker,   port: <port>, runtime: <runtime>, cpu: <cpu>, memory: <mem>, desiredCount: <n>, obs: { dashboard: true, alarms: false } }
 
 # ── 6. Observability — tier-level policy ──
@@ -206,12 +214,23 @@ security:
   secrets: []                      # [optional] Secrets Manager secret names the tasks read
   taskRolePolicies: []             # [optional] extra IAM statements for the task role (TBD if unknown)
 
+# ── 8. CI/CD ──
+cicd:
+  imageTagStrategy: git-sha        # [optional: git-sha] options: git-sha | semver
+  deployStrategy: rolling          # [optional: rolling] options: rolling | blue-green
+  # initial image tag is `init-v0.1.0` (policy — not asked)
+
 # ============================================================
 #  Reference: per-tier derive policy (the skill handles this; no need to fill)
 # ============================================================
 # compute:  non-prod cpu=max(256,prod/2) mem=max(512,prod/2) desired=1 max=1 exec=true
 #           pre-prod cpu=prod mem=prod desired=1 max=2 exec=false
-#           prod     cpu=input mem=input desired=2 max=4 exec=false
+#           prod     cpu=input mem=input desired=2 max=input(default 4) exec=false
+# scaling:  min=1 ; metric=cpu ; target=70%  (unless overridden)
+# cache:    by service type — api=caching-disabled ; frontend=caching-optimized ; worker=none
+# priority: by type — api rules first ; frontend is the default/catch-all
+# ecr:      removalPolicy non-prod=destroy / pre-prod,prod=retain ; maxImageCount non-prod=5 / prod=30
+# cdk-nag:  dev=false ; uat,pre-prod,prod=true
 # domain:   uses the domain filled in project.env[].domain (1 domain per env)
 # names:    resources named {app}-{env}-<resource> ; shared ECR uses {app}-{service}
 #

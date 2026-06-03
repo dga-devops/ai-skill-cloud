@@ -63,6 +63,8 @@ networking:
 # ── 3. Platform ─────────────────────────────────────────────
 platform:
   placement: { services: container }   # ECS tasks run in the container subnet tier (100.64.x)
+  basePath: /cp/dga/demo               # shared prefix — services reference it as {base}
+  albHealthCheck: { interval: 30, healthyThreshold: 3, unhealthyThreshold: 3 }
   tiers:
     non-prod:
       ecs:        { enabled: true, containerInsights: false }
@@ -83,8 +85,8 @@ platform:
 
 # ── 4. Services (cpu/memory/desiredCount = prod baseline; non-prod derives) ──
 services:
-  - { name: api,      type: api,      port: 3000, runtime: node,    health: /health, path: /cp/dga/demo/api/*, cpu: 2048, memory: 4096, desiredCount: 2, obs: { dashboard: true, alarms: true } }
-  - { name: frontend, type: frontend, port: 4200, runtime: angular, health: /health, path: /cp/dga/demo/*,     cpu: 1024, memory: 2048, desiredCount: 2, obs: { dashboard: true, alarms: true } }
+  - { name: api,      type: api,      port: 3000, runtime: node,    health: /health, path: "{base}/api/*", cpu: 2048, memory: 4096, desiredCount: 2, obs: { dashboard: true, alarms: true } }
+  - { name: frontend, type: frontend, port: 4200, runtime: angular, health: /health, path: "{base}/*",     cpu: 1024, memory: 2048, desiredCount: 2, obs: { dashboard: true, alarms: true } }
 
 # ── 5. Observability ────────────────────────────────────────
 observability:
