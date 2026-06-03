@@ -133,13 +133,33 @@ platform:
 # ── 4. Data services — optional add-ons (delete unused blocks) ──
 # Whole section [optional] ; per-tier differences use tier keys ; resource names derive: {app}-{env}-xxx
 dataServices:
+  aurora:                          # relational DB (Aurora Serverless v2)
+    enabled: <bool>                # [required if block present]
+    engine: aurora-postgresql      # [required if enabled] options: aurora-postgresql | aurora-mysql
+    engineVersion: "15.4"          # [optional]
+    databaseName: <db-name>        # [required if enabled]
+    minAcu: 0.5                    # [optional: 0.5] Serverless v2 min ACU
+    maxAcu:                        # [optional] max ACU per tier (e.g. non-prod 2 | prod 8)
+      <tier>: <acu>
+    subnet: database               # [optional]
+    # derived per tier: multiAz (prod=true), backupRetention (7/14/30), deletionProtection (non-prod=false)
+  dynamodb:                        # NoSQL table
+    enabled: <bool>                # [required if block present]
+    tableName: <name>              # [required if enabled]
+    billingMode: PAY_PER_REQUEST   # [optional: PAY_PER_REQUEST] options: PAY_PER_REQUEST | PROVISIONED
+    partitionKey: <name>:<type>    # [required if enabled] e.g. id:S
+    sortKey: <name>:<type>         # [optional] e.g. createdAt:S
   elasticache:                     # Redis/Valkey
     enabled: <bool>                # [required if block present]
     engine: <engine>               # [required if enabled] options: valkey | redis
+    engineVersion: "7.0"           # [optional]
     port: 6379                     # [optional]
     subnet: database               # [optional]
     nodeType:                      # [required if enabled] differs per tier
       <tier>: <node-type>          # e.g. cache.t4g.micro | cache.t4g.medium
+    numNodes:                      # [optional] per tier (non-prod 1 | prod 2)
+      <tier>: <n>
+    clusterMode: false             # [optional: false]
   redshift:                        # data warehouse
     enabled: <bool>                # [required if block present]
     type: serverless               # [required if enabled] options: serverless | provisioned
@@ -163,10 +183,17 @@ dataServices:
   s3:
     enabled: <bool>                # [required if block present]
     purpose: <purpose>             # [required if enabled] e.g. firehose-backup | assets | upload
+    versioning: true               # [optional: true]
+    encryption: AES256             # [optional: AES256] options: AES256 | aws:kms
+    publicAccess: false            # [optional: false]
+    lifecycleDays: 0               # [optional: 0=never] expire objects after N days
   sqs:
     enabled: <bool>                # [required if block present]
-    # visibilityTimeout: 30        # [optional]
-    # deadLetterQueue: true        # [optional]
+    name: <name>                   # [required if enabled] queue purpose/name
+    visibilityTimeout: 30          # [optional: 30]
+    deadLetterQueue: true          # [optional: true]
+    maxReceiveCount: 3             # [optional: 3] when DLQ on
+    eventbridge: false             # [optional: false] EventBridge integration
 
 # ── 5. Services — workloads on ECS Fargate (path-based routing via ALB) ──
 # [required] at least 1 service
