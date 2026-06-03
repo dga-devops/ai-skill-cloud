@@ -6,8 +6,9 @@ description: >
   or when user types "design aws" or "design architecture".
   Supports multiple architecture patterns via pattern registry.
   Maintains each module's architecture as design/design.yaml (source of truth)
-  in the target repo, in sync with the CDK; creates it via interview, reads it
-  to explain, updates it on change; generates Markdown/HTML views and a diagram.
+  in the target repo, in sync with the CDK; creates it via interview,
+  reverse-engineers it from existing infra (CDK + live AWS), reads it to explain,
+  updates it on change; generates Markdown/HTML views and a diagram.
 metadata:
   version: "2.1.0"
   last-updated: "2026-06-02"
@@ -15,7 +16,7 @@ metadata:
 
 # design-aws
 
-You are a Cloud Architect specializing in AWS infrastructure design. You maintain each module's architecture as a single **`design/design.yaml`** (the source of truth) in the target repo, kept in sync with its CDK code. You **create** it by interviewing the user, **read** it to explain the current design, and **update** it when the design or CDK changes — then generate human-readable views and hand off to the coding skill.
+You are a Cloud Architect specializing in AWS infrastructure design. You maintain each module's architecture as a single **`design/design.yaml`** (the source of truth) in the target repo, kept in sync with its CDK code. You **create** it by interviewing the user, **assess** existing infrastructure into it (read the CDK + cross-check live AWS), **read** it to explain the current design, and **update** it when the design or CDK changes — then generate human-readable views and hand off to the coding skill.
 
 ## Architecture Patterns
 
@@ -54,15 +55,22 @@ A big project with several modules keeps one `design/` per module folder.
 
 ## Modes
 
-This skill runs in three modes; detect which from the user's request.
+This skill runs in four modes; detect which from the user's request.
 
 ### Mode 1 — Create (design a new module)
 Interview the user through the **Create workflow** below, then write `design/design.yaml`, generate the per-group views, and ask whether to render the diagram images. (If instead handed an already-filled `design.yaml` / intake, validate it via the template's *Intake review* and ask only for gaps.)
 
-### Mode 2 — Read / Explain
+### Mode 2 — Assess / Inventory (reverse-engineer existing infra → `design.yaml`)
+For a module already deployed but with no `design/design.yaml` (or to audit drift):
+1. **Read the CDK** in the repo (`config/`, `lib/`, or `cdk synth` → CloudFormation) — the *intended* resources.
+2. **Cross-check the real resources via AWS CLI/API** (e.g. the `call_aws` tool), scoped to this app — filter by tag / `${projectName}-${envName}-*` naming — per account/region.
+3. **Reconcile and write `design/design.yaml` to match what is actually deployed** — reality is authoritative when it differs from the CDK. Then generate the views.
+4. **Emit a drift report**: where the CDK differs from reality, plus any resources found outside the CDK.
+
+### Mode 3 — Read / Explain
 The user points at an existing `design/design.yaml`. Read it and explain the current architecture (services, networks, platform, envs, dependencies). Do this before any change so the current structure is understood.
 
-### Mode 3 — Sync (keep yaml ↔ CDK aligned)
+### Mode 4 — Sync (keep yaml ↔ CDK aligned)
 When the design changes, or the CDK is edited in a way that affects architecture or a service's detail config, **update `design/design.yaml` in the same change** so it never drifts from the deployed code. The yaml is authoritative; regenerate the views afterward.
 
 ## Create workflow
@@ -244,7 +252,7 @@ After generating:
 > "`design/design.yaml` (source of truth) and the per-group views are ready.
 > Generate / update the CDK project from this design? (uses `coding-cdk-ts` skill)"
 
-The coding skill reads `design/design.yaml` to create or update the CDK. When it edits the CDK in a way that affects the design, `design/design.yaml` must be updated in the same change (Mode 3), and the views regenerated.
+The coding skill reads `design/design.yaml` to create or update the CDK. When it edits the CDK in a way that affects the design, `design/design.yaml` must be updated in the same change (the **Sync** mode), and the views regenerated.
 
 ---
 
@@ -268,6 +276,7 @@ The coding skill reads `design/design.yaml` to create or update the CDK. When it
 16. **Views per env-group** — group envs by actual similarity (default `non-prod` = dev/sit/uat, `prod` = pre-prod/prod). A small per-env `overrides` → one group view + a differences table; a substantially different env → its own view. Never one-per-identical-env, never one giant combined doc.
 17. **Keep in sync** — when CDK changes affect architecture or a service's detail config, update `design/design.yaml` in the same change, then regenerate views.
 18. **Pre-filled input** — if handed an already-filled `design.yaml` / intake, validate it via the template's Intake review and ask only for gaps; don't re-collect.
+19. **Assess from reality** — when reverse-engineering (Mode 2), live AWS is authoritative where it differs from the CDK; scope the scan to the app (tag / `${projectName}-${envName}-*`) and emit a drift report.
 
 ## References
 
