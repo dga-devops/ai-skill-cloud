@@ -61,11 +61,11 @@ This skill runs in four modes; detect which from the user's request.
 Interview the user through the **Create workflow** below, then write `design/design.yaml`, generate the per-group views, and ask whether to render the diagram images. (If instead handed an already-filled `design.yaml` / intake, validate it via the template's *Intake review* and ask only for gaps.)
 
 ### Mode 2 — Assess / Inventory (reverse-engineer existing infra → `design.yaml`)
-For a module already deployed but with no `design/design.yaml` (or to audit drift):
-1. **Read the CDK** in the repo (`config/`, `lib/`, or `cdk synth` → CloudFormation) — the *intended* resources.
-2. **Cross-check the real resources via AWS CLI/API** (e.g. the `call_aws` tool), scoped to this app — filter by tag / `${projectName}-${envName}-*` naming — per account/region.
-3. **Reconcile and write `design/design.yaml` to match what is actually deployed** — reality is authoritative when it differs from the CDK. Then generate the views.
-4. **Emit a drift report**: where the CDK differs from reality, plus any resources found outside the CDK.
+For a module already deployed but with no `design/design.yaml` (or to audit drift). Full procedure: `references/patterns/<pattern>/assess.md`.
+1. **Intended (CDK):** run `cdk synth` → the resolved CloudFormation template(s).
+2. **Reality (AWS):** discover live resources via AWS CLI/API (e.g. `call_aws`), per account/region. **Seed by tags** (`Project={app}`, `Environment={env}`; fallback name `{app}-{env}-*`), then **follow dependencies** to connected resources — including untagged/shared ones (VPC, SGs, ALB, cert…) — for a complete inventory.
+3. **Reconcile → write `design/design.yaml` to match what is actually deployed** (live AWS is authoritative on drift). Then generate the views.
+4. **Drift report:** write `design/<group>/drift-report.md` — in-CDK-not-deployed, deployed-not-in-CDK, config-differs, and shared/external resources.
 
 ### Mode 3 — Read / Explain
 The user points at an existing `design/design.yaml`. Read it and explain the current architecture (services, networks, platform, envs, dependencies). Do this before any change so the current structure is understood.
@@ -292,6 +292,7 @@ The coding skill reads `design/design.yaml` to create or update the CDK. When it
 - `references/shared/naming-limits.md` — AWS resource naming limits
 - `references/patterns/ecs-fargate/checklist.md` — ECS Fargate pattern checklist (interactive path)
 - `references/patterns/ecs-fargate/defaults.md` — ECS Fargate defaults and spec calculation
+- `references/patterns/ecs-fargate/assess.md` — Assess/Inventory procedure (reverse-engineer live infra → design.yaml)
 
 **Output (generated views):**
 - `references/shared/design-doc-template.md` — Markdown design doc template
