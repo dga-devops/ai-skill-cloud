@@ -24,6 +24,9 @@ pattern: ecs-fargate               # [required] keep this value
 # One project can have multiple envs; tier drives derive policy (sizing/waf/log/nat)
 project:
   name: <app-name>                 # [required] prefix for every resource (lowercase, a-z0-9-)
+  description: <text>              # [optional] short description of the app
+  owner: <owner>                   # [optional] -> Owner tag
+  team: <team>                     # [optional] -> Team tag
   env:                             # [required] at least 1 env
     - name: <env-name>             # [required] e.g. sit | uat | dev | staging
       tier: <tier>                 # [required] options: non-prod | pre-prod | prod
@@ -188,6 +191,20 @@ services:
 observability:
   logRetention:                    # [required] days (e.g. non-prod 7 | pre-prod 30 | prod 90)
     <tier>: <days>
+  alarms:                          # [optional] CloudWatch alarm thresholds (materialize on pre-prod/prod)
+    cpuPercent: 80                 # [optional: 80]
+    memoryPercent: 80              # [optional: 80]
+    errorRatePercent: 5            # [optional: 5]
+  xray: false                      # [optional: false] X-Ray tracing
+
+# ── 7. Security & IAM ──
+# SG rules + ECS execution role are AUTO-DERIVED from services (not filled here).
+security:
+  cdkNag:                          # [optional] derived: dev=false, others=true (override per env if needed)
+    # <env>: <bool>
+  egress: all-outbound             # [optional: all-outbound] options: all-outbound | restricted
+  secrets: []                      # [optional] Secrets Manager secret names the tasks read
+  taskRolePolicies: []             # [optional] extra IAM statements for the task role (TBD if unknown)
 
 # ============================================================
 #  Reference: per-tier derive policy (the skill handles this; no need to fill)
