@@ -287,10 +287,8 @@ The coding skill reads `design/design.yaml` to create or update the CDK. When it
 - `references/patterns/ecs-fargate/intake-example-tgw.yaml` — preset: office/GIN via Transit Gateway
 
 **Supporting:**
-- `references/shared/checklist-common.md` — Common checklist (Identity, DNS, Observability, Security, CI/CD)
 - `references/shared/profiles.md` — Environment tier profiles and sizing policy
 - `references/shared/naming-limits.md` — AWS resource naming limits
-- `references/patterns/ecs-fargate/checklist.md` — ECS Fargate pattern checklist (interactive path)
 - `references/patterns/ecs-fargate/defaults.md` — ECS Fargate defaults and spec calculation
 - `references/patterns/ecs-fargate/assess.md` — Assess/Inventory procedure (reverse-engineer live infra → design.yaml)
 

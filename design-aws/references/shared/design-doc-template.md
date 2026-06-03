@@ -1,6 +1,6 @@
 # Design Document Template
 
-Use this template to generate the design document. Replace `{{placeholder}}` with actual values from the checklist. Pattern-specific sections use conditional blocks.
+Use this template to generate the design document. Replace `{{placeholder}}` with actual values from `design.yaml`. Pattern-specific sections use conditional blocks.
 
 ---
 
