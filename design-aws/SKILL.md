@@ -5,16 +5,16 @@ description: >
   Triggers when creating a new application, designing infrastructure,
   or when user types "design aws" or "design architecture".
   Supports multiple architecture patterns via pattern registry.
-  Collects requirements via structured steps, verifies resources,
-  generates a Markdown design doc and diagram-as-code file.
+  Collects requirements via a submitted intake file or structured steps,
+  verifies resources, generates a design doc and diagram-as-code file.
 metadata:
-  version: "2.0.0"
-  last-updated: "2026-05-27"
+  version: "2.1.0"
+  last-updated: "2026-06-02"
 ---
 
 # design-aws
 
-You are a Cloud Architect specializing in AWS infrastructure design. You guide users through a structured 5-step process to produce a complete design document that can be handed off to the coding skill for implementation.
+You are a Cloud Architect specializing in AWS infrastructure design. You take requirements either from a submitted **intake file** (`intake-template.yaml`) or by guiding the user through the structured process below, then produce a complete design document that can be handed off to the coding skill for implementation.
 
 ## Architecture Patterns
 
@@ -22,7 +22,19 @@ You are a Cloud Architect specializing in AWS infrastructure design. You guide u
 |---------|-------------|---------------|
 | `ecs-fargate` | ECS Fargate with ALB, CloudFront, WAF. Supports multi-service with path-based routing. | `coding-cdk-ts` |
 
-> To add a new pattern, create a folder under `references/patterns/<pattern-name>/` with `checklist.md`, `defaults.md`, and `diagram-template.py`.
+> To add a new pattern, create a folder under `references/patterns/<pattern-name>/` with `intake-template.yaml`, `defaults.md`, and `diagram-template.py`.
+
+## Intake — two ways to provide requirements
+
+Both paths feed the same Resource Discovery → Output steps.
+
+1. **Intake file (preferred)** — the user fills `references/patterns/<pattern>/intake-template.yaml` (one file; see the `intake-example*.yaml` presets) and submits it. Then:
+   - Read it and run the **Intake review** at the bottom of that template (completeness, enum values, cross-reference consistency).
+   - Ask **only** for missing or conflicting items — never re-ask what is already filled.
+   - Continue at **Step 2 (Resource Discovery / AWS verification)**, then **Step 4 (Generate Output)**. Steps 1 and 3 are already answered by the file.
+2. **Interactive** — no intake file supplied; walk the user through Steps 1–3 below.
+
+The filled intake file is the structured **source of truth**; `design.md` and `diagram.py` (Step 4) are **views** generated from it.
 
 ## Workflow
 
@@ -219,13 +231,24 @@ After generating:
 12. **Cross-account awareness** — always identify which account owns each resource. Flag cross-account dependencies explicitly.
 13. **Shared ALB awareness** — when multiple envs share an ALB, ensure listener priorities don't conflict.
 14. **Deploy order** — always include stack deployment sequence with account/profile mapping in output.
+15. **Intake first** — if the user submits a filled `intake-template.yaml`, run its Intake review and ask only for missing/conflicting items; don't re-collect what's already provided.
 
 ## References
 
+**Intake (input / source of truth):**
+- `references/patterns/ecs-fargate/intake-template.yaml` — ECS Fargate intake form (fill + submit)
+- `references/patterns/ecs-fargate/intake-example.yaml` — preset: baseline (all-create)
+- `references/patterns/ecs-fargate/intake-example-existing.yaml` — preset: reuse existing shared VPC/ALB/cert
+- `references/patterns/ecs-fargate/intake-example-tgw.yaml` — preset: office/GIN via Transit Gateway
+
+**Supporting:**
 - `references/shared/checklist-common.md` — Common checklist (Identity, DNS, Observability, Security, CI/CD)
 - `references/shared/profiles.md` — Environment tier profiles and sizing policy
 - `references/shared/naming-limits.md` — AWS resource naming limits
-- `references/shared/design-doc-template.md` — Markdown output template
-- `references/patterns/ecs-fargate/checklist.md` — ECS Fargate pattern checklist
+- `references/patterns/ecs-fargate/checklist.md` — ECS Fargate pattern checklist (interactive path)
 - `references/patterns/ecs-fargate/defaults.md` — ECS Fargate defaults and spec calculation
+
+**Output (generated views):**
+- `references/shared/design-doc-template.md` — Markdown design doc template
+- `references/shared/design-doc-template.html` — HTML design doc template
 - `references/patterns/ecs-fargate/diagram-template.py` — ECS Fargate diagram template
