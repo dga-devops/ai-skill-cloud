@@ -6,7 +6,7 @@
 #    2. Submit the filled file to the design-aws skill
 #    3. The agent reads it and checks completeness/consistency via reasoning
 #       (see "Intake review" at the end of this file)
-#       *No validator script* — correctness relies on the comments here + checklist.md/defaults.md
+#       *No validator script* — correctness relies on the comments here + defaults.md
 #
 #  Legend (how mandatory each field is):
 #    [required]            = always required
@@ -280,5 +280,5 @@ cicd:
 #     - acm.domain (wildcard) must cover every env domain served by that ALB
 #     - platform.placement.services tier must exist in each tier's subnets
 #     - env.overrides (if any) patches that env's resolved config (tier is the base); keep it minimal — marks intra-group differences (e.g. uat WAF)
-#  4. Cross-check against the pattern's checklist.md + defaults.md for sane values
+#  4. Cross-check against the pattern's defaults.md for sane values
 #  5. Summarize as a table: complete / missing / conflicting -> if missing, ask only for those items, not everything again
