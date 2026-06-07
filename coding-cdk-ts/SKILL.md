@@ -57,7 +57,6 @@ See `references/structure.md` for full details and rationale.
 3. **Multi-Environment Config**: Every resource that varies per environment must be driven by `config/[env]/`. Use `enabled` flags to conditionally instantiate stacks in `bin/app.ts`. Use `IntraEnvConfig` to share env metadata across resource configs. See `references/config-pattern.md`.
 4. **Security Enforcement**: 
    - Use `cdk-nag` with `AwsSolutionsChecks` as an Aspect on the app.
-   - **Mandatory**: `uat`, `preprod`, and `prod` MUST have cdk-nag enabled.
    - See `references/security.md` for scanning tools and versioning practices.
 5. **Testing Strategy**: Write fine-grained assertion tests (one test file per stack). Use the ARRANGE → ACT → ASSERT pattern with `Template.fromStack()`. See `references/testing.md`.
 6. **Version Management**: 
@@ -69,7 +68,6 @@ See `references/structure.md` for full details and rationale.
 7. **Build Hygiene**: After build/test verification, always run `npm run clean` to remove generated `.js`/`.d.ts` files. Never leave build artifacts in the working tree when presenting results.
 8. **Config Completeness**: When creating a new config interface, audit all resource properties in the stack that have literal values (numbers, strings). Every literal that could reasonably differ between environments must be a config field — even if the user didn't mention it explicitly.
 9. **Stack Outputs**: Every stack MUST export a `CfnOutput` for every resource it creates. Use ARN if the resource supports it (ALB, ECS Cluster, RDS, IAM Role, Log Group, ACM Certificate); use resource ID otherwise (VPC, Subnet, IGW, NAT Gateway, Route Table, Security Group, EIP). This enables cross-stack references via `Fn.importValue` and provides a deployment audit trail.
-10. **Design Handoff**: When creating a project from a design doc (`designs/<app-name>/design.md`), read the doc first and follow `references/design-handoff.md` for patterns not covered in other references (multi-service, existing VPC/ALB, CloudFront behaviors, domain per env, SG auto-generation, IAM roles, WAF). Create the project at `projects/<app-name>/`.
 
 ## Core Constraints
 
@@ -100,39 +98,3 @@ See `references/structure.md` for full details and rationale.
 > - `references/testing.md` — TDD approach, fine-grained assertions, unit test templates
 > - `references/security.md` — cdk-nag, Checkov, documentation with TypeDoc, versioning & release
 > - `references/versions.md` — Pinned dependency versions, standardized configs, upgrade/downgrade procedures
-> - `references/design-handoff.md` — Design doc handoff patterns: multi-service, existing VPC/ALB, CloudFront, DNS, SG, IAM, WAF
-
----
-
-## Design Handoff (from design skill)
-
-When user says "create CDK from design", "generate CDK project", or references a design doc:
-
-### 1. Read Design Doc
-- Read `designs/<app-name>/design.md`
-- If not found, ask user for the path
-
-### 2. Extract & Map
-
-| Design Doc Section | CDK Output |
-|-------------------|------------|
-| App Identity | `config/*/env.ts` (IntraEnvConfig) |
-| Services table | `config/types.ts` + `config/*/services.ts` |
-| Environment Matrix | per-env folders with correct enabled flags |
-| Existing Infrastructure | `config/dev/vpc.ts`, `config/dev/alb.ts` with IDs |
-| CloudFront Behaviors | `config/*/cloudfront.ts` + `lib/cloudfront-stack.ts` |
-| SG Rules | auto-generated in stack code from services |
-| IAM Roles | `lib/service-stack.ts` (execution + task roles) |
-| DNS/Domains | `config/*/dns.ts` + `lib/dns-stack.ts` |
-| CDK Config Values | copy directly into config files |
-
-### 3. Create Project
-- Path: `projects/<app-name>/`
-- Follow three-layer architecture (config/lib/test)
-- Generate all stacks based on resource list
-- Use `enabled` flags per environment tier
-
-### 4. Validation
-- `npm run build` — verify TypeScript compiles
-- `npm test` — run unit tests
-- cdk-nag enabled for uat/pre-prod/prod configs
