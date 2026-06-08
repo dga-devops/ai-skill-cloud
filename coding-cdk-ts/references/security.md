@@ -146,6 +146,14 @@ removalPolicy: config.env.envName === 'prod'
   : RemovalPolicy.DESTROY
 ```
 
+### Don't Share One RemovalPolicy Across Unrelated Resource Types
+
+Give each resource type its **own** `removalPolicy` config field. Reusing one field across resources with different lifecycles causes deploy-blocking conflicts.
+
+**Concrete failure:** A CloudWatch Log Group reusing the ECR repository's `removalPolicy` (e.g. `config.services.ecrRemovalPolicy`). In a `RETAIN` tier (prod/uat), when the stack rolls back the log group is **retained/orphaned** instead of being cleaned up. The next deploy then tries to create a log group with the same name and fails with `already exists`.
+
+A log group's lifecycle has nothing to do with the ECR image registry's — keep them on separate config fields (e.g. `logGroupRemovalPolicy` vs `ecrRemovalPolicy`) so each can be tuned independently.
+
 ---
 
 ## IAM: Use Grant Helpers

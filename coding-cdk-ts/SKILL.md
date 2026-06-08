@@ -7,8 +7,8 @@ description: >
   scanning, unit testing, or dependency version management.
   Use for any task involving CDK code in bin/, lib/, config/, or test/.
 metadata:
-  version: "1.1.0"
-  last-updated: "2026-05-08"
+  version: "1.2.0"
+  last-updated: "2026-06-08"
 ---
 
 # coding-cdk-ts
@@ -86,6 +86,7 @@ See `references/structure.md` for full details and rationale.
     Always include `<purpose>` even if only one instance exists, for consistency. Names are constructed in config using `IntraEnvConfig` values — never hardcoded in `lib/`.
     
     **Length validation**: Always test generated names with the longest env name (`pre-prod`). Key limits: Target Group = 32, ALB/NLB = 32, IAM Role = 64, S3 = 63. If exceeded, shorten the purpose suffix (e.g. `frontend` → `fe`). See `references/naming-limits.md` for full list.
+- **Preserve Overridden Dependencies**: When `addPropertyOverride()`/`addOverride()` replaces a property that normally carries a `Ref`/`Fn::GetAtt` to another resource (e.g. overriding an ECS Service's `TaskDefinition` with a raw family name), the implicit `DependsOn` is lost. ALWAYS restore it with `<construct>.node.addDependency(<target>)`, or deploys fail non-deterministically (`... not found`) across environments. See `references/constructs.md`.
 - **500-Resource Limit**: CloudFormation stacks are capped at 500 resources. Split large applications into multiple focused stacks before reaching the limit.
 - **Bootstrap First**: Run `cdk bootstrap aws://<account>/<region>` once per account/region pair before the first `cdk deploy`.
 
