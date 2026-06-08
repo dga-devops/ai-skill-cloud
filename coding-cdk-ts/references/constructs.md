@@ -113,6 +113,49 @@ The preceding code example shows the following workflow:
 2. You use the `node.findChild()` method to locate the specific `LaunchConfig` child of the L2 `AutoScalingGroup` construct and cast it as the `CfnLaunchConfiguration` resource.
 3. You can now set the `launchConfig.metadataOptions` property on the L1 `CfnLaunchConfiguration`.
 
+## Preserve Implicit Dependencies When Overriding References
+
+When you pass a construct to an L2 prop (e.g. `taskDefinition: taskDef`), CDK renders a `Ref` / `Fn::GetAtt` in the template. CloudFormation reads that token and creates an **implicit `DependsOn`** — the referenced resource is always provisioned first.
+
+`addPropertyOverride()` / `addOverride()` replace the rendered value with a raw literal. The `Ref` disappears — **and the implicit dependency disappears with it.** CloudFormation is then free to order those resources independently, producing non-deterministic deploy failures where a resource is created before the thing it depends on exists.
+
+> **⚠️ Rule:** Whenever an override replaces a property that normally carries a cross-resource `Ref` / `Fn::GetAtt`, restore the ordering manually with `<construct>.node.addDependency(<target>)`.
+
+**Symptom:** Intermittent `cdk deploy` failures such as `TaskDefinition not found`, `... does not exist`, or `... not found` on the overridden resource. Typically *passes on the first environment* (CloudFormation happened to create the dependency first) and *fails on the next* with identical code — a classic race condition.
+
+**Common case — ECS Service referencing a TaskDefinition by family name** (so the CI/CD pipeline owns the running revision, not CDK):
+
+```typescript
+const service = new ecs.FargateService(this, `${name}Service`, {
+  cluster,
+  taskDefinition: taskDef,   // CDK renders a Ref → implicit DependsOn on taskDef
+  // ...
+});
+
+// Override to a raw family name so CI/CD controls the running revision.
+// ⚠️ This deletes the Ref — and the implicit dependency along with it.
+const cfnService = service.node.defaultChild as ecs.CfnService;
+cfnService.addPropertyOverride('TaskDefinition', family);
+
+// ✅ Restore the ordering: TaskDefinition is now always registered before the Service.
+service.node.addDependency(taskDef);
+```
+
+## ECS Service: Fast-Fail Deployments
+
+Enable the deployment circuit breaker on ECS services so a bad deployment rolls back in minutes instead of hanging:
+
+```typescript
+const service = new ecs.FargateService(this, `${name}Service`, {
+  cluster,
+  taskDefinition: taskDef,
+  circuitBreaker: { rollback: true },
+  // ...
+});
+```
+
+Without it, if a task can't pull its image or never reaches a healthy state, CloudFormation waits for the full service stabilization timeout (~3 hours) before failing the stack. cdk-nag already flags the missing setting via `@aws-cdk/aws-ecs:shouldUseCircuitBreaker`.
+
 ## Custom Resources
 
 You can use custom resources to write custom provisioning logic in templates that CloudFormation runs whenever you create, update (if you changed the custom resource), or delete stacks. For example, you can use a custom resource if you want to include resources that aren't available in the AWS CDK. That way you can still manage all your related resources in a single stack.
