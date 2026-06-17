@@ -210,6 +210,35 @@ taskDef.addContainer(`${name}Container`, {
 });
 ```
 
+## ECS Service: Tag Propagation
+
+Tags applied at the stack level (via CDK `Tags`/Aspects) and on the service do **not** reach the running tasks unless the service is told to propagate them. By default ECS propagates nothing, so tasks show up untagged in Cost Explorer and resource groups — breaking cost allocation and governance even though the service itself is tagged correctly.
+
+> **⚠️ Rule:** On every ECS/Fargate service set `propagateTags: ecs.PropagatedTagSource.SERVICE` and `enableECSManagedTags: true`. The first flows your own service-level tags (`Project`, `Environment`, `Owner`, cost center) down to each task; the second adds AWS-managed tags (`aws:ecs:clusterName`, `aws:ecs:serviceName`) for traceability.
+
+`propagateTags` accepts a **single source** — you cannot merge both:
+
+| Value | Tasks inherit tags from |
+|-------|-------------------------|
+| `PropagatedTagSource.SERVICE` | the **Service** — use this; org-wide tags applied by CDK Aspects land on the service |
+| `PropagatedTagSource.TASK_DEFINITION` | the **Task Definition** only |
+| `PropagatedTagSource.NONE` (default) | nothing — tasks stay untagged |
+
+**Symptom:** No error at synth or deploy; tasks simply have no business tags, so Cost Explorer cannot attribute Fargate spend to a project/team.
+
+```typescript
+const service = new ecs.FargateService(this, `${name}Service`, {
+  cluster,
+  taskDefinition: taskDef,
+  circuitBreaker: { rollback: true },
+  // ✅ Flow service-level tags (Project/Owner/Environment) down to each task.
+  propagateTags: ecs.PropagatedTagSource.SERVICE,
+  // ✅ Add AWS-managed tags (aws:ecs:clusterName, aws:ecs:serviceName).
+  enableECSManagedTags: true,
+  // ...
+});
+```
+
 ## Custom Resources
 
 You can use custom resources to write custom provisioning logic in templates that CloudFormation runs whenever you create, update (if you changed the custom resource), or delete stacks. For example, you can use a custom resource if you want to include resources that aren't available in the AWS CDK. That way you can still manage all your related resources in a single stack.
