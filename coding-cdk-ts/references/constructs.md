@@ -156,6 +156,60 @@ const service = new ecs.FargateService(this, `${name}Service`, {
 
 Without it, if a task can't pull its image or never reaches a healthy state, CloudFormation waits for the full service stabilization timeout (~3 hours) before failing the stack. cdk-nag already flags the missing setting via `@aws-cdk/aws-ecs:shouldUseCircuitBreaker`.
 
+## ALB ↔ ECS: Target Registration
+
+Because we compose L2 constructs by hand (no `ApplicationLoadBalancedFargateService` L3 pattern), the service is **not** wired to the load balancer automatically. Creating a target group and a listener rule is not enough — the service must register its tasks as targets.
+
+> **⚠️ Rule:** When an ECS/Fargate service sits behind an ALB, always register it as a target via `service.attachToApplicationTargetGroup(targetGroup)` (or `targetGroup.addTarget(service)`). A target group + listener rule alone leaves the target group empty.
+
+**Symptom:** `cdk synth`/`cdk deploy` both succeed and the task reaches `RUNNING`, but the ALB returns **HTTP 503** for every request because the target group has no registered targets. Like the `DependsOn` race above, this is a "passes synth, fails at runtime" pitfall — the gap is invisible in the template.
+
+```typescript
+const service = new ecs.FargateService(this, `${name}Service`, {
+  cluster,
+  taskDefinition: taskDef,
+  circuitBreaker: { rollback: true },
+  // ...
+});
+
+const targetGroup = new elbv2.ApplicationTargetGroup(this, `${name}Tg`, {
+  vpc,
+  port: containerPort,
+  protocol: elbv2.ApplicationProtocol.HTTP,
+  targetType: elbv2.TargetType.IP,
+  // health check, name from config, etc.
+});
+
+listener.addTargetGroups(`${name}Rule`, {
+  targetGroups: [targetGroup],
+  // conditions, priority, ...
+});
+
+// ✅ Without this the target group stays empty → ALB returns 503 despite RUNNING tasks.
+service.attachToApplicationTargetGroup(targetGroup);
+```
+
+## ECS: ECR Image Pull Permission
+
+For container images stored in ECR, use `ecs.ContainerImage.fromEcrRepository(repo, tag)`. This grants the task **execution role** pull permission on that repository automatically. Referencing the same image by its registry URI with `ecs.ContainerImage.fromRegistry('<account>.dkr.ecr.<region>.amazonaws.com/<repo>:<tag>')` does **not** grant any permission — `fromRegistry` is for public/external registries and assumes the role can already pull.
+
+> **⚠️ Rule:** Pull ECR images with `fromEcrRepository(repo, tag)`, not `fromRegistry(<ECR URI>)`. The former wires up the execution-role pull grant; the latter leaves it missing.
+
+**Symptom:** The task fails to start with `CannotPullContainerError` (access denied on the ECR repository), even though the image and tag exist.
+
+```typescript
+import * as ecr from 'aws-cdk-lib/aws-ecr';
+
+const repo = ecr.Repository.fromRepositoryName(this, 'Repo', repoName);
+
+taskDef.addContainer(`${name}Container`, {
+  // ✅ Grants the execution role ecr:GetDownloadUrlForLayer / BatchGetImage automatically.
+  image: ecs.ContainerImage.fromEcrRepository(repo, imageTag),
+  // ❌ ecs.ContainerImage.fromRegistry(ecrUri) → no grant → CannotPullContainerError
+  // ...
+});
+```
+
 ## Custom Resources
 
 You can use custom resources to write custom provisioning logic in templates that CloudFormation runs whenever you create, update (if you changed the custom resource), or delete stacks. For example, you can use a custom resource if you want to include resources that aren't available in the AWS CDK. That way you can still manage all your related resources in a single stack.

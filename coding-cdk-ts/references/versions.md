@@ -44,7 +44,7 @@ Versions that all projects should use. Deployed and verified in production:
 
 | Package | Version | Range Strategy | Notes |
 |---------|---------|---------------|-------|
-| `aws-cdk` (CLI) | `2.1117.0` | **exact** — prevents CLI/lib mismatch | Must match resolved aws-cdk-lib |
+| `aws-cdk` (CLI) | `2.1117.0` | **exact** — prevents CLI/lib mismatch | Must be ≥ the CLI that ships with the **resolved** `aws-cdk-lib` — see CLI ↔ lib note below |
 | `typescript` | `~5.9.3` | tilde — accepts patch only | Prevents breaking changes from minor |
 | `ts-node` | `^10.9.2` | caret | TypeScript execution engine |
 | `jest` | `^30` | caret | Test runner |
@@ -64,6 +64,14 @@ Versions that all projects should use. Deployed and verified in production:
 | `^2.247.0` (caret) | Accepts `>=2.247.0 <3.0.0` | Library that follows semver well |
 | `~5.9.3` (tilde) | Accepts `>=5.9.3 <5.10.0` | Library where minor versions may break |
 | `2.1117.0` (exact) | Accepts only this version | CLI tools that must match the library |
+
+### CLI ↔ lib Compatibility (must verify together)
+
+`aws-cdk-lib` carries a caret range (`^2.247.0`), so `npm install` resolves it **upward** to the latest 2.x (e.g. `2.258.x`). Each `aws-cdk-lib` minor emits a cloud-assembly template at a given **schema version**, and the `aws-cdk` CLI can only read schemas up to the one it shipped with. A CLI pinned **older** than the resolved library fails `cdk synth`/`cdk deploy` with an error like *"This CDK CLI is not compatible with the CDK library used by your application. Please upgrade"* (it cannot read the newer cloud-assembly schema).
+
+**Rule:** the pinned CLI must be **≥** the CLI version that shipped alongside whatever `aws-cdk-lib` actually resolves to — not merely the one matching the floor `2.247.0`. When bumping the `aws-cdk-lib` base/proven tier, bump the pinned CLI in lockstep and re-verify `cdk synth`. The two are released as a matched pair (lib `2.A.B` ↔ CLI `2.1XYZ.B`); pinning the lib with a caret while pinning the CLI exact is the combination that drifts out of sync.
+
+> Concrete failure seen: CLI `2.1117.0` (exact) could not read the schema emitted by a resolved `aws-cdk-lib` newer than its matched pair. Fix is to pin the CLI to the version paired with the resolved library — only when the user authorizes a version change.
 
 ---
 
@@ -288,10 +296,16 @@ const walk = (dir) => {
     "skipLibCheck": true,
     "typeRoots": ["./node_modules/@types"]
   },
+  "ts-node": {
+    "preferTsExts": true,
+    "experimentalResolver": true
+  },
   "include": ["bin/**/*.ts", "lib/**/*.ts", "config/**/*.ts", "test/**/*.ts"],
   "exclude": ["node_modules", "dist", "cdk.out"]
 }
 ```
+
+> **`ts-node.experimentalResolver`**: With `moduleResolution: "NodeNext"`, relative imports must carry a `.js` extension (e.g. `import { Foo } from './foo.js'`). `cdk.json` runs the app through `npx ts-node`, which by default cannot map that `.js` specifier back to the real `.ts` file — so `cdk synth`/`cdk deploy` fail with `Cannot find module './foo.js'`. `experimentalResolver: true` enables ts-node's extension remapping; `preferTsExts` mirrors the `--prefer-ts-exts` flag in `cdk.json`. (Jest handles the same problem via `moduleNameMapper` in `jest.config.js`.)
 
 ### cdk.json
 
@@ -401,6 +415,14 @@ module.exports = {
   testMatch: ['**/*.test.ts'],
   transform: {
     '^.+\\.tsx?$': 'ts-jest',
+  },
+  // tsconfig uses moduleResolution "NodeNext", which forces relative imports to
+  // carry a .js extension (e.g. `import { Foo } from './foo.js'`). ts-jest compiles
+  // .ts source, so without this mapping Jest cannot resolve the .js specifier and
+  // every test fails with "Cannot find module './foo.js'". Strip the extension so
+  // Jest resolves the real .ts file. REQUIRED whenever module is NodeNext.
+  moduleNameMapper: {
+    '^(\\.{1,2}/.*)\\.js$': '$1',
   },
 };
 ```
