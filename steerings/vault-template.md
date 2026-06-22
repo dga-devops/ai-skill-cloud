@@ -64,6 +64,9 @@ Severity: 🔴 Critical | 🟡 Medium | 🟢 Low
 ## Root Cause
 {the real reason}
 
+## Self-Check
+{how to diagnose this yourself — the exact checks/commands to run and which output reveals the cause, so next time you can confirm whether a problem is THIS one (not how to verify the fix)}
+
 ## Fix
 {what was done}
 
